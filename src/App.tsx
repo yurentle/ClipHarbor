@@ -4,6 +4,7 @@ import { Copy, File, Heart, Photo, Search, Trash } from 'tabler-icons-react'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import 'dayjs/locale/zh-cn'
+import './App.css'
 
 // 配置 dayjs
 dayjs.extend(relativeTime)
@@ -150,9 +151,9 @@ function App() {
 
   return (
     <AppShell>
-      <Container size="md" py="xl">
-        <Stack gap="lg">
-          <Group>
+      <Container size="md">
+        <Stack gap="sm">
+          <Group p="20px">
             <TextInput
               placeholder="搜索剪贴板历史..."
               value={searchQuery}
@@ -173,20 +174,14 @@ function App() {
             />
           </Group>
           <ScrollArea h={500}>
-            <Stack gap="md">
+            <Stack gap="md" pt={4}>
               {filteredHistory.map((item) => (
                 <Card 
                   key={item.id} 
                   withBorder 
                   shadow="sm" 
                   padding="sm"
-                  style={{
-                    transition: 'all 0.2s ease',
-                    '&:hover': {
-                      transform: 'translateY(-2px)',
-                      boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
-                    },
-                  }}
+                  className="card-hover"
                 >
                   <Group justify="space-between" align="start">
                     <Box style={{ flex: 1 }}>
@@ -198,17 +193,28 @@ function App() {
                           variant="filled"
                           color={item.favorite ? "red" : "gray"}
                           onClick={() => handleToggleFavorite(item.id)}
+                          className="action-icon-hover"
                         >
                           <Heart size={16} style={{ fill: item.favorite ? 'white' : 'none' }} />
                         </ActionIcon>
                       </Tooltip>
                       <Tooltip key={`copy-${item.id}`} label="复制">
-                        <ActionIcon variant="light" color="blue" onClick={() => handleCopy(item)}>
+                        <ActionIcon 
+                          variant="light" 
+                          color="blue" 
+                          onClick={() => handleCopy(item)}
+                          className="action-icon-hover"
+                        >
                           <Copy size={16} />
                         </ActionIcon>
                       </Tooltip>
                       <Tooltip key={`delete-${item.id}`} label="删除">
-                        <ActionIcon variant="light" color="red" onClick={() => handleRemove(item.id)}>
+                        <ActionIcon 
+                          variant="light" 
+                          color="red" 
+                          onClick={() => handleRemove(item.id)}
+                          className="action-icon-hover"
+                        >
                           <Trash size={16} />
                         </ActionIcon>
                       </Tooltip>

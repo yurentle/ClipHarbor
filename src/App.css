@@ -1,42 +1,47 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+body {
+  overflow: hidden;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
+/* 隐藏窗口滚动条 */
+.mantine-Container-root {
+  overflow: hidden;
+  padding-bottom: 50px;
 }
+
+/* 保持列表滚动条样式 */
+.mantine-ScrollArea-root {
+  overflow: auto;
+}
+
+.mantine-ScrollArea-root .mantine-ScrollArea-viewport {
+  padding: 0 20px 20px;
+}
+
+.card-hover {
+  transition: all 0.2s ease;
+  cursor: default;
+  border: 1px solid transparent;
+}
+
+.card-hover:hover {
+  transform: translateY(-3px);
+  box-shadow: rgba(0, 0, 0, 0.1) 0px 10px 15px -3px, rgba(0, 0, 0, 0.05) 0px 4px 6px -2px;
+  background-color: #f8f9fa;
+  border-color: #e9ecef;
+}
+
+.action-icon-hover {
+  transition: all 0.2s ease;
+}
+
+.action-icon-hover:hover {
+  transform: scale(1.15);
+  filter: brightness(1.1);
+}
+
 .logo:hover {
   filter: drop-shadow(0 0 2em #646cffaa);
 }
 .logo.react:hover {
   filter: drop-shadow(0 0 2em #61dafbaa);
-}
-
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
-}
-
-.card {
-  padding: 2em;
-}
-
-.read-the-docs {
-  color: #888;
 }
