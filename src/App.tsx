@@ -184,6 +184,8 @@ function App() {
                   shadow="sm" 
                   padding="sm"
                   className="card-hover"
+                  onDoubleClick={() => handleCopy(item)}
+                  style={{ cursor: 'pointer' }}
                 >
                   <Group justify="space-between" align="start">
                     <Box style={{ flex: 1 }}>
