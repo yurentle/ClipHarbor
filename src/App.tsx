@@ -192,7 +192,7 @@ function App() {
                     <Group gap="xs">
                       <Tooltip key={`favorite-${item.id}`} label={item.favorite ? "取消收藏" : "收藏"}>
                         <ActionIcon
-                          variant="filled"
+                          variant={item.favorite ? "filled" : "light"}
                           color={item.favorite ? "red" : "gray"}
                           onClick={() => handleToggleFavorite(item.id)}
                           className="action-icon-hover"
