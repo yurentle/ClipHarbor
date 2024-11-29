@@ -138,9 +138,11 @@ function App() {
       default:
         return (
           <Box>
-            <Text size="sm" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-              {item.content}
-            </Text>
+            <ScrollArea style={{ maxHeight: 200, overflowY: 'auto' }}>
+              <Text size="sm" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                {item.content}
+              </Text>
+            </ScrollArea>
             <Text size="xs" c="dimmed" mt={4}>
               {timeAgo} · {contentInfo()}
             </Text>
