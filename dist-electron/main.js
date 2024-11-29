@@ -28,30 +28,79 @@ async function createWindow() {
   }
   let lastClipboardContent = clipboard.readText();
   setInterval(() => {
+    const filePaths = clipboard.readBuffer("FileNameW").toString("ucs2").replace(/\0/g, "").trim();
+    if (filePaths) {
+      const paths = filePaths.split("\r\n").filter(Boolean);
+      if (paths.length > 0) {
+        const history = store.get("clipboardHistory", []);
+        const newItem = {
+          id: Date.now().toString(),
+          content: paths.join("\n"),
+          type: "file",
+          timestamp: Date.now(),
+          favorite: false
+        };
+        const newHistory = [newItem, ...history.filter((item) => item.content !== newItem.content)].slice(0, 50);
+        store.set("clipboardHistory", newHistory);
+        mainWindow.webContents.send("clipboard-change", newItem);
+        return;
+      }
+    }
+    const image = clipboard.readImage();
+    if (!image.isEmpty()) {
+      const history = store.get("clipboardHistory", []);
+      const newItem = {
+        id: Date.now().toString(),
+        content: image.toDataURL(),
+        type: "image",
+        timestamp: Date.now(),
+        favorite: false
+      };
+      const newHistory = [newItem, ...history.filter((item) => item.content !== newItem.content)].slice(0, 50);
+      store.set("clipboardHistory", newHistory);
+      mainWindow.webContents.send("clipboard-change", newItem);
+      return;
+    }
     const currentContent = clipboard.readText();
-    if (currentContent !== lastClipboardContent) {
+    if (currentContent && currentContent !== lastClipboardContent) {
       lastClipboardContent = currentContent;
       const history = store.get("clipboardHistory", []);
-      const newHistory = [currentContent, ...history.filter((item) => item !== currentContent)].slice(0, 50);
+      const newItem = {
+        id: Date.now().toString(),
+        content: currentContent,
+        type: "text",
+        timestamp: Date.now(),
+        favorite: false
+      };
+      const newHistory = [newItem, ...history.filter((item) => item.content !== newItem.content)].slice(0, 50);
       store.set("clipboardHistory", newHistory);
-      mainWindow.webContents.send("clipboard-change", currentContent);
+      mainWindow.webContents.send("clipboard-change", newItem);
     }
   }, 1e3);
   ipcMain.handle("get-clipboard-history", () => {
     return store.get("clipboardHistory", []);
   });
-  ipcMain.handle("save-to-clipboard", (_, text) => {
-    clipboard.writeText(text);
+  ipcMain.handle("save-to-clipboard", (_, item) => {
+    if (item.type === "image") {
+      const image = clipboard.readImage().create(item.content);
+      clipboard.writeImage(image);
+    } else {
+      clipboard.writeText(item.content);
+    }
+    return true;
+  });
+  ipcMain.handle("remove-from-history", (_, id) => {
     const history = store.get("clipboardHistory", []);
-    const newHistory = [text, ...history.filter((item) => item !== text)].slice(0, 50);
+    const newHistory = history.filter((item) => item.id !== id);
     store.set("clipboardHistory", newHistory);
     return true;
   });
-  ipcMain.handle("remove-from-history", (_, text) => {
+  ipcMain.handle("toggle-favorite", (_, id) => {
     const history = store.get("clipboardHistory", []);
-    const newHistory = history.filter((item) => item !== text);
+    const newHistory = history.map(
+      (item) => item.id === id ? { ...item, favorite: !item.favorite } : item
+    );
     store.set("clipboardHistory", newHistory);
-    mainWindow.webContents.send("clipboard-change", clipboard.readText());
     return true;
   });
 }

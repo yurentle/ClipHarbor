@@ -13,6 +13,7 @@ declare global {
       onClipboardChange: (callback: (content: string) => void) => void
       getClipboardHistory: () => Promise<string[]>
       saveToClipboard: (text: string) => Promise<boolean>
+      removeFromHistory: (text: string) => Promise<boolean>
     }
   }
 }

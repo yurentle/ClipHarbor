@@ -2,11 +2,14 @@
 const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("electronAPI", {
   onClipboardChange: (callback) => {
-    ipcRenderer.on("clipboard-change", (_event, content) => callback(content));
+    const subscription = (_event, content) => callback(content);
+    ipcRenderer.on("clipboard-change", subscription);
     return () => {
-      ipcRenderer.removeAllListeners("clipboard-change");
+      ipcRenderer.removeListener("clipboard-change", subscription);
     };
   },
   getClipboardHistory: () => ipcRenderer.invoke("get-clipboard-history"),
-  saveToClipboard: (text) => ipcRenderer.invoke("save-to-clipboard", text)
+  saveToClipboard: (item) => ipcRenderer.invoke("save-to-clipboard", item),
+  removeFromHistory: (id) => ipcRenderer.invoke("remove-from-history", id),
+  toggleFavorite: (id) => ipcRenderer.invoke("toggle-favorite", id)
 });
