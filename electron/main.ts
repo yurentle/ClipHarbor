@@ -1,6 +1,7 @@
-const { app, BrowserWindow, clipboard, ipcMain } = require('electron')
+const { app, BrowserWindow, clipboard, ipcMain, nativeImage } = require('electron')
 const path = require('path')
 const Store = require('electron-store')
+const { v4: uuidv4 } = require('uuid')
 
 // 定义剪贴板项的类型
 interface ClipboardItem {
@@ -9,6 +10,11 @@ interface ClipboardItem {
   type: 'text' | 'image' | 'file'
   timestamp: number
   favorite: boolean
+  metadata?: {
+    width?: number
+    height?: number
+    size?: number
+  }
 }
 
 const store = new Store({
@@ -19,6 +25,18 @@ const store = new Store({
 })
 
 const __dirname = path.dirname(__filename)
+
+function getImageMetadata(dataUrl: string): { width: number; height: number; size: number } {
+  const img = nativeImage.createFromDataURL(dataUrl)
+  const size = Buffer.from(dataUrl.split(',')[1], 'base64').length
+  const { width, height } = img.getSize()
+  
+  return {
+    width,
+    height,
+    size
+  }
+}
 
 async function createWindow() {
   const mainWindow = new BrowserWindow({
@@ -40,60 +58,67 @@ async function createWindow() {
   }
 
   // 监听剪贴板变化
-  let lastClipboardContent = clipboard.readText()
-  setInterval(() => {
-    // 检查是否有文件路径
-    const filePaths = clipboard.readBuffer('FileNameW').toString('ucs2').replace(/\0/g, '').trim()
-    if (filePaths) {
-      const paths = filePaths.split('\r\n').filter(Boolean)
-      if (paths.length > 0) {
+  let lastContent = ''
+  let lastImage: string | null = null
+  
+  setInterval(async () => {
+    try {
+      // 检查是否有文件路径
+      const filePaths = clipboard.readBuffer('FileNameW').toString('ucs2').replace(/\0/g, '').trim()
+      if (filePaths) {
+        const paths = filePaths.split('\r\n').filter(Boolean)
+        if (paths.length > 0) {
+          const history = store.get('clipboardHistory', []) as ClipboardItem[]
+          const newItem: ClipboardItem = {
+            id: uuidv4(),
+            content: paths.join('\n'),
+            type: 'file',
+            timestamp: Date.now(),
+            favorite: false
+          }
+          const newHistory = [newItem, ...history.filter(item => item.content !== newItem.content)].slice(0, 50)
+          store.set('clipboardHistory', newHistory)
+          mainWindow.webContents.send('clipboard-change', newItem)
+          return
+        }
+      }
+
+      // 检查是否有图片
+      const image = clipboard.readImage()
+      if (!image.isEmpty()) {
+        const dataUrl = image.toDataURL()
+        if (dataUrl !== lastImage) {
+          lastImage = dataUrl
+          const metadata = getImageMetadata(dataUrl)
+          const history = store.get('clipboardHistory', []) as ClipboardItem[]
+          const newItem: ClipboardItem = {
+            id: uuidv4(),
+            content: dataUrl,
+            type: 'image',
+            timestamp: Date.now(),
+            favorite: false,
+            metadata
+          }
+          const newHistory = [newItem, ...history.filter(i => i.content !== dataUrl)].slice(0, 50)
+          store.set('clipboardHistory', newHistory)
+          mainWindow.webContents.send('clipboard-change', newItem)
+        }
+      } else if (clipboard.readText() && clipboard.readText() !== lastContent) {
+        lastContent = clipboard.readText()
         const history = store.get('clipboardHistory', []) as ClipboardItem[]
         const newItem: ClipboardItem = {
-          id: Date.now().toString(),
-          content: paths.join('\n'),
-          type: 'file',
+          id: uuidv4(),
+          content: clipboard.readText(),
+          type: 'text',
           timestamp: Date.now(),
           favorite: false
         }
-        const newHistory = [newItem, ...history.filter(item => item.content !== newItem.content)].slice(0, 50)
+        const newHistory = [newItem, ...history.filter(i => i.content !== newItem.content)].slice(0, 50)
         store.set('clipboardHistory', newHistory)
         mainWindow.webContents.send('clipboard-change', newItem)
-        return
       }
-    }
-
-    // 检查是否有图片
-    const image = clipboard.readImage()
-    if (!image.isEmpty()) {
-      const history = store.get('clipboardHistory', []) as ClipboardItem[]
-      const newItem: ClipboardItem = {
-        id: Date.now().toString(),
-        content: image.toDataURL(),
-        type: 'image',
-        timestamp: Date.now(),
-        favorite: false
-      }
-      const newHistory = [newItem, ...history.filter(item => item.content !== newItem.content)].slice(0, 50)
-      store.set('clipboardHistory', newHistory)
-      mainWindow.webContents.send('clipboard-change', newItem)
-      return
-    }
-
-    // 检查文本内容
-    const currentContent = clipboard.readText()
-    if (currentContent && currentContent !== lastClipboardContent) {
-      lastClipboardContent = currentContent
-      const history = store.get('clipboardHistory', []) as ClipboardItem[]
-      const newItem: ClipboardItem = {
-        id: Date.now().toString(),
-        content: currentContent,
-        type: 'text',
-        timestamp: Date.now(),
-        favorite: false
-      }
-      const newHistory = [newItem, ...history.filter(item => item.content !== newItem.content)].slice(0, 50)
-      store.set('clipboardHistory', newHistory)
-      mainWindow.webContents.send('clipboard-change', newItem)
+    } catch (error) {
+      console.error('Error reading clipboard:', error)
     }
   }, 1000)
 

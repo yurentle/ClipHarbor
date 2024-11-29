@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react'
 import { ActionIcon, AppShell, Box, Card, Container, Group, ScrollArea, SegmentedControl, Stack, Text, TextInput, Tooltip } from '@mantine/core'
 import { Copy, File, Heart, Photo, Search, Trash } from 'tabler-icons-react'
+import dayjs from 'dayjs'
+import relativeTime from 'dayjs/plugin/relativeTime'
+import 'dayjs/locale/zh-cn'
+
+// 配置 dayjs
+dayjs.extend(relativeTime)
+dayjs.locale('zh-cn')
 
 // 定义剪贴板项的类型
 interface ClipboardItem {
@@ -9,9 +16,23 @@ interface ClipboardItem {
   type: 'text' | 'image' | 'file'
   timestamp: number
   favorite: boolean
+  metadata?: {
+    width?: number
+    height?: number
+    size?: number
+  }
 }
 
 type CategoryType = 'all' | 'text' | 'image' | 'file' | 'favorite'
+
+// 格式化文件大小
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return bytes + ' B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return (bytes / Math.pow(k, i)).toFixed(1) + ' ' + sizes[i]
+}
 
 function App() {
   const [clipboardHistory, setClipboardHistory] = useState<ClipboardItem[]>([])
@@ -73,25 +94,60 @@ function App() {
     })
 
   const renderContent = (item: ClipboardItem) => {
+    const timeAgo = dayjs(item.timestamp).fromNow()
+    const contentInfo = () => {
+      switch (item.type) {
+        case 'text':
+          return `${item.content.length} 个字符`
+        case 'image':
+          if (item.metadata?.width && item.metadata?.height && item.metadata?.size) {
+            return `${item.metadata.width}x${item.metadata.height} · ${formatFileSize(item.metadata.size)}`
+          }
+          return '图片'
+        case 'file':
+          if (item.metadata?.size) {
+            return formatFileSize(item.metadata.size)
+          }
+          return '文件'
+      }
+    }
+
     switch (item.type) {
       case 'image':
-        return <img src={item.content} alt="Clipboard content" style={{ maxWidth: '100%', maxHeight: '200px' }} />
+        return (
+          <Box>
+            <img src={item.content} alt="Clipboard content" style={{ maxWidth: '100%', maxHeight: '200px' }} />
+            <Text size="xs" c="dimmed" mt={4}>
+              {timeAgo} · {contentInfo()}
+            </Text>
+          </Box>
+        )
       case 'file':
         return (
-          <Group gap="xs">
-            <File size={16} />
-            <Text size="sm" style={{ wordBreak: 'break-all' }}>{item.content}</Text>
-          </Group>
+          <Box>
+            <Group gap="xs">
+              <File size={16} />
+              <Text size="sm" style={{ wordBreak: 'break-all' }}>{item.content}</Text>
+            </Group>
+            <Text size="xs" c="dimmed" mt={4}>
+              {timeAgo} · {contentInfo()}
+            </Text>
+          </Box>
         )
       default:
         return (
-          <Text size="sm" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-            {item.content}
-          </Text>
+          <Box>
+            <Text size="sm" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+              {item.content}
+            </Text>
+            <Text size="xs" c="dimmed" mt={4}>
+              {timeAgo} · {contentInfo()}
+            </Text>
+          </Box>
         )
     }
   }
-console.log(filteredHistory)
+
   return (
     <AppShell>
       <Container size="md" py="xl">
@@ -119,7 +175,19 @@ console.log(filteredHistory)
           <ScrollArea h={500}>
             <Stack gap="md">
               {filteredHistory.map((item) => (
-                <Card key={item.id} withBorder shadow="sm" padding="sm">
+                <Card 
+                  key={item.id} 
+                  withBorder 
+                  shadow="sm" 
+                  padding="sm"
+                  style={{
+                    transition: 'all 0.2s ease',
+                    '&:hover': {
+                      transform: 'translateY(-2px)',
+                      boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+                    },
+                  }}
+                >
                   <Group justify="space-between" align="start">
                     <Box style={{ flex: 1 }}>
                       {renderContent(item)}
