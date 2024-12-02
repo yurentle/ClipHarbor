@@ -16,6 +16,9 @@ interface ElectronAPI {
   saveToClipboard: (item: ClipboardItem) => Promise<boolean>
   removeFromHistory: (id: string) => Promise<boolean>
   toggleFavorite: (id: string) => Promise<boolean>
+  toggleDock: (show: boolean) => Promise<boolean>
+  toggleTray: (show: boolean) => Promise<boolean>
+  getDefaultShortcut: () => Promise<string>
 }
 
 // 声明全局类型
@@ -37,5 +40,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getClipboardHistory: () => ipcRenderer.invoke('get-clipboard-history'),
   saveToClipboard: (item: ClipboardItem) => ipcRenderer.invoke('save-to-clipboard', item),
   removeFromHistory: (id: string) => ipcRenderer.invoke('remove-from-history', id),
-  toggleFavorite: (id: string) => ipcRenderer.invoke('toggle-favorite', id)
+  toggleFavorite: (id: string) => ipcRenderer.invoke('toggle-favorite', id),
+  toggleDock: (show: boolean) => ipcRenderer.invoke('toggle-dock', show),
+  toggleTray: (show: boolean) => ipcRenderer.invoke('toggle-tray', show),
+  getDefaultShortcut: () => ipcRenderer.invoke('get-default-shortcut'),
 } as ElectronAPI)
