@@ -103,6 +103,16 @@ function registerIpcHandlers() {
   })
 }
 
+// 广播剪贴板变化到所有窗口
+function broadcastClipboardChange(item: ClipboardItem) {
+  if (mainWindow) {
+    mainWindow.webContents.send('clipboard-change', item);
+  }
+  if (historyWindow) {
+    historyWindow.webContents.send('clipboard-change', item);
+  }
+}
+
 // 创建历史记录窗口
 async function createHistoryWindow() {
   console.log('Creating history window...');
@@ -244,13 +254,12 @@ async function createWindow() {
       contextIsolation: true,
       sandbox: false,
     },
-  })
+  });
 
   try {
     // 在开发环境中，尝试连接到 Vite 开发服务器
     const isDev = process.env.NODE_ENV === 'development' || process.env.DEBUG_PROD === 'true';
     if (isDev) {
-      // 默认的 Vite 开发服务器地址
       const devServerUrl = 'http://localhost:5173';
       console.log('Development mode - Loading URL:', devServerUrl);
       try {
@@ -282,41 +291,50 @@ async function createWindow() {
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
+}
 
-  // 监听剪贴板变化
-  let lastContent = ''
-  let lastImage: string | null = null
-  
-  setInterval(async () => {
+// 开始监听剪贴板变化
+function startClipboardMonitoring() {
+  console.log('Starting clipboard monitoring...');
+  let lastContent = '';
+  let lastImage = '';
+
+  // 每秒检查一次剪贴板变化
+  setInterval(() => {
     try {
-      // 检查是否有文件路径
-      const filePaths = clipboard.readBuffer('FileNameW').toString('ucs2').replace(/\0/g, '').trim()
-      if (filePaths) {
-        const paths = filePaths.split('\r\n').filter(Boolean)
-        if (paths.length > 0) {
-          const history = store.get('clipboardHistory', []) as ClipboardItem[]
-          const newItem: ClipboardItem = {
-            id: uuidv4(),
-            content: paths.join('\n'),
-            type: 'file',
-            timestamp: Date.now(),
-            favorite: false
+      // 检查是否有文件
+      const filePaths = clipboard.readBuffer('FileNameW');
+      if (filePaths.length > 0) {
+        try {
+          const files = clipboard.readBuffer('FileNameW').toString('ucs2').replace(/\\/g, '/').split('\0').filter(Boolean);
+          if (files.length > 0 && files.join(',') !== lastContent) {
+            lastContent = files.join(',');
+            const history = store.get('clipboardHistory', []) as ClipboardItem[];
+            const newItem: ClipboardItem = {
+              id: uuidv4(),
+              content: files.join(','),
+              type: 'file',
+              timestamp: Date.now(),
+              favorite: false
+            }
+            const newHistory = [newItem, ...history.filter(item => item.content !== newItem.content)].slice(0, 50);
+            store.set('clipboardHistory', newHistory);
+            broadcastClipboardChange(newItem);
           }
-          const newHistory = [newItem, ...history.filter(item => item.content !== newItem.content)].slice(0, 50)
-          store.set('clipboardHistory', newHistory)
-          mainWindow.webContents.send('clipboard-change', newItem)
-          return
+        } catch (error) {
+          console.error('Error processing file paths:', error);
         }
+        return;
       }
 
       // 检查是否有图片
-      const image = clipboard.readImage()
+      const image = clipboard.readImage();
       if (!image.isEmpty()) {
-        const dataUrl = image.toDataURL()
+        const dataUrl = image.toDataURL();
         if (dataUrl !== lastImage) {
-          lastImage = dataUrl
-          const metadata = getImageMetadata(dataUrl)
-          const history = store.get('clipboardHistory', []) as ClipboardItem[]
+          lastImage = dataUrl;
+          const metadata = getImageMetadata(dataUrl);
+          const history = store.get('clipboardHistory', []) as ClipboardItem[];
           const newItem: ClipboardItem = {
             id: uuidv4(),
             content: dataUrl,
@@ -325,28 +343,34 @@ async function createWindow() {
             favorite: false,
             metadata
           }
-          const newHistory = [newItem, ...history.filter(i => i.content !== dataUrl)].slice(0, 50)
-          store.set('clipboardHistory', newHistory)
-          mainWindow.webContents.send('clipboard-change', newItem)
+          const newHistory = [newItem, ...history.filter(i => i.content !== dataUrl)].slice(0, 50);
+          store.set('clipboardHistory', newHistory);
+          broadcastClipboardChange(newItem);
         }
-      } else if (clipboard.readText() && clipboard.readText() !== lastContent) {
-        lastContent = clipboard.readText()
-        const history = store.get('clipboardHistory', []) as ClipboardItem[]
-        const newItem: ClipboardItem = {
-          id: uuidv4(),
-          content: clipboard.readText(),
-          type: 'text',
-          timestamp: Date.now(),
-          favorite: false
+      } else {
+        // 检查文本内容
+        const text = clipboard.readText();
+        if (text && text !== lastContent) {
+          lastContent = text;
+          const history = store.get('clipboardHistory', []) as ClipboardItem[];
+          const newItem: ClipboardItem = {
+            id: uuidv4(),
+            content: text,
+            type: 'text',
+            timestamp: Date.now(),
+            favorite: false
+          }
+          const newHistory = [newItem, ...history.filter(i => i.content !== newItem.content)].slice(0, 50);
+          store.set('clipboardHistory', newHistory);
+          broadcastClipboardChange(newItem);
         }
-        const newHistory = [newItem, ...history.filter(i => i.content !== newItem.content)].slice(0, 50)
-        store.set('clipboardHistory', newHistory)
-        mainWindow.webContents.send('clipboard-change', newItem)
       }
     } catch (error) {
-      console.error('Error reading clipboard:', error)
+      console.error('Error reading clipboard:', error);
     }
-  }, 1000)
+  }, 1000);
+
+  console.log('Clipboard monitoring started');
 }
 
 app.whenReady().then(async () => {
@@ -368,7 +392,7 @@ app.whenReady().then(async () => {
   });
 
   // 开始监听剪贴板变化
-  // startClipboardMonitoring();
+  startClipboardMonitoring();
 });
 
 app.on('window-all-closed', () => {

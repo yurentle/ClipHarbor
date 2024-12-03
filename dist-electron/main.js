@@ -96,6 +96,14 @@ function registerIpcHandlers() {
     return process.platform === "darwin" ? "Command+Shift+V" : "Ctrl+Shift+V";
   });
 }
+function broadcastClipboardChange(item) {
+  if (mainWindow) {
+    mainWindow.webContents.send("clipboard-change", item);
+  }
+  if (historyWindow) {
+    historyWindow.webContents.send("clipboard-change", item);
+  }
+}
 async function createHistoryWindow() {
   console.log("Creating history window...");
   if (historyWindow) {
@@ -239,27 +247,35 @@ async function createWindow() {
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
+}
+function startClipboardMonitoring() {
+  console.log("Starting clipboard monitoring...");
   let lastContent = "";
-  let lastImage = null;
-  setInterval(async () => {
+  let lastImage = "";
+  setInterval(() => {
     try {
-      const filePaths = electron.clipboard.readBuffer("FileNameW").toString("ucs2").replace(/\0/g, "").trim();
-      if (filePaths) {
-        const paths = filePaths.split("\r\n").filter(Boolean);
-        if (paths.length > 0) {
-          const history = store.get("clipboardHistory", []);
-          const newItem = {
-            id: v4(),
-            content: paths.join("\n"),
-            type: "file",
-            timestamp: Date.now(),
-            favorite: false
-          };
-          const newHistory = [newItem, ...history.filter((item) => item.content !== newItem.content)].slice(0, 50);
-          store.set("clipboardHistory", newHistory);
-          mainWindow.webContents.send("clipboard-change", newItem);
-          return;
+      const filePaths = electron.clipboard.readBuffer("FileNameW");
+      if (filePaths.length > 0) {
+        try {
+          const files = electron.clipboard.readBuffer("FileNameW").toString("ucs2").replace(/\\/g, "/").split("\0").filter(Boolean);
+          if (files.length > 0 && files.join(",") !== lastContent) {
+            lastContent = files.join(",");
+            const history = store.get("clipboardHistory", []);
+            const newItem = {
+              id: v4(),
+              content: files.join(","),
+              type: "file",
+              timestamp: Date.now(),
+              favorite: false
+            };
+            const newHistory = [newItem, ...history.filter((item) => item.content !== newItem.content)].slice(0, 50);
+            store.set("clipboardHistory", newHistory);
+            broadcastClipboardChange(newItem);
+          }
+        } catch (error) {
+          console.error("Error processing file paths:", error);
         }
+        return;
       }
       const image = electron.clipboard.readImage();
       if (!image.isEmpty()) {
@@ -278,26 +294,30 @@ async function createWindow() {
           };
           const newHistory = [newItem, ...history.filter((i) => i.content !== dataUrl)].slice(0, 50);
           store.set("clipboardHistory", newHistory);
-          mainWindow.webContents.send("clipboard-change", newItem);
+          broadcastClipboardChange(newItem);
         }
-      } else if (electron.clipboard.readText() && electron.clipboard.readText() !== lastContent) {
-        lastContent = electron.clipboard.readText();
-        const history = store.get("clipboardHistory", []);
-        const newItem = {
-          id: v4(),
-          content: electron.clipboard.readText(),
-          type: "text",
-          timestamp: Date.now(),
-          favorite: false
-        };
-        const newHistory = [newItem, ...history.filter((i) => i.content !== newItem.content)].slice(0, 50);
-        store.set("clipboardHistory", newHistory);
-        mainWindow.webContents.send("clipboard-change", newItem);
+      } else {
+        const text = electron.clipboard.readText();
+        if (text && text !== lastContent) {
+          lastContent = text;
+          const history = store.get("clipboardHistory", []);
+          const newItem = {
+            id: v4(),
+            content: text,
+            type: "text",
+            timestamp: Date.now(),
+            favorite: false
+          };
+          const newHistory = [newItem, ...history.filter((i) => i.content !== newItem.content)].slice(0, 50);
+          store.set("clipboardHistory", newHistory);
+          broadcastClipboardChange(newItem);
+        }
       }
     } catch (error) {
       console.error("Error reading clipboard:", error);
     }
   }, 1e3);
+  console.log("Clipboard monitoring started");
 }
 electron.app.whenReady().then(async () => {
   console.log("App is ready, initializing...");
@@ -309,6 +329,7 @@ electron.app.whenReady().then(async () => {
       await createWindow();
     }
   });
+  startClipboardMonitoring();
 });
 electron.app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
