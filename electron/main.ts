@@ -136,7 +136,6 @@ async function createHistoryWindow() {
     },
     frame: false,  // 移除窗口边框
     transparent: true,  // 允许透明
-    titleBarStyle: 'hidden',  // 隐藏标题栏
     show: false,
     alwaysOnTop: true,
     vibrancy: 'menu',  // 添加毛玻璃效果（仅在 macOS 上生效）
