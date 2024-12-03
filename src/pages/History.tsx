@@ -38,7 +38,7 @@ function History() {
   const [clipboardHistory, setClipboardHistory] = useState<ClipboardItem[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [category, setCategory] = useState<CategoryType>('all')
-  console.log('clipboardHistory---------')
+
   useEffect(() => {
     // 获取历史记录
     window.electronAPI.getClipboardHistory().then((history) => {
@@ -80,18 +80,13 @@ function History() {
   }
 
   // 过滤历史记录
-  const filteredHistory = clipboardHistory
-    .filter(item => {
-      // 先按分类过滤
-      if (category === 'all') return true
-      if (category === 'favorite') return item.favorite
-      return item.type === category
-    })
-    .filter(item => {
-      // 再按搜索词过滤
-      if (!searchQuery) return true
-      return item.content.toLowerCase().includes(searchQuery.toLowerCase())
-    })
+  const filteredHistory = clipboardHistory.filter(item => {
+    const matchesCategory = category === 'all' || 
+                          (category === 'favorite' && item.favorite) || 
+                          category === item.type
+    const matchesSearch = item.content.toLowerCase().includes(searchQuery.toLowerCase())
+    return matchesCategory && matchesSearch
+  })
 
   const renderContent = (item: ClipboardItem) => {
     const timeAgo = dayjs(item.timestamp).fromNow()
@@ -150,14 +145,19 @@ function History() {
   }
 
   return (
-    <Container size="md">
-      <Stack gap="sm">
-        <Group p="20px">
+    <Container p="xs" style={{ 
+      backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+      minHeight: '100vh',
+      borderRadius: '10px',
+      WebkitAppRegion: 'drag', // 允许拖动窗口
+    }}>
+      <Stack gap="md">
+        <Group justify="space-between" style={{ WebkitAppRegion: 'no-drag' }}> {/* 搜索区域不可拖动 */}
           <TextInput
             placeholder="搜索剪贴板历史..."
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.currentTarget.value)}
             leftSection={<Search size={16} />}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
             style={{ flex: 1 }}
           />
           <SegmentedControl
@@ -230,4 +230,4 @@ function History() {
   )
 }
 
-export default History 
+export default History

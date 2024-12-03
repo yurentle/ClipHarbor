@@ -120,8 +120,20 @@ async function createHistoryWindow() {
       contextIsolation: true,
       sandbox: false
     },
-    show: false,
-    alwaysOnTop: true
+    frame: false,
+    // 移除窗口边框
+    // transparent: true,
+    // 允许透明
+    // titleBarStyle: "hidden",
+    // 隐藏标题栏
+    // show: false,
+    // alwaysOnTop: true,
+    // vibrancy: "menu",
+    // 添加毛玻璃效果（仅在 macOS 上生效）
+    // visualEffectState: "active",
+    // 保持毛玻璃效果活跃（仅在 macOS 上生效）
+    // roundedCorners: true
+    // 圆角窗口（仅在 macOS 上生效）
   });
   console.log("Loading URL for history window...");
   return new Promise(async (resolve, reject) => {
