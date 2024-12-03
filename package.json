@@ -52,7 +52,6 @@
     "tabler-icons-react": "^1.56.0",
     "typescript": "^5.2.2",
     "vite": "^5.1.6",
-    "vite-plugin-electron": "^0.29.0",
-    "zustand": "^5.0.1"
+    "vite-plugin-electron": "^0.29.0"
   }
 }
