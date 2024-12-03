@@ -19,6 +19,7 @@ interface ElectronAPI {
   toggleDock: (show: boolean) => Promise<boolean>
   toggleTray: (show: boolean) => Promise<boolean>
   getDefaultShortcut: () => Promise<string>
+  closeHistoryWindow: () => Promise<void>
 }
 
 // 声明全局类型
@@ -44,4 +45,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   toggleDock: (show: boolean) => ipcRenderer.invoke('toggle-dock', show),
   toggleTray: (show: boolean) => ipcRenderer.invoke('toggle-tray', show),
   getDefaultShortcut: () => ipcRenderer.invoke('get-default-shortcut'),
+  closeHistoryWindow: () => ipcRenderer.invoke('close-history-window'),
 } as ElectronAPI)

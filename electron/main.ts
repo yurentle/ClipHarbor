@@ -101,6 +101,13 @@ function registerIpcHandlers() {
   ipcMain.handle('get-default-shortcut', () => {
     return process.platform === 'darwin' ? 'Command+Shift+V' : 'Ctrl+Shift+V'
   })
+
+  // 关闭历史窗口
+  ipcMain.handle('close-history-window', () => {
+    if (historyWindow) {
+      historyWindow.hide()
+    }
+  })
 }
 
 // 广播剪贴板变化到所有窗口
@@ -250,6 +257,19 @@ function registerShortcuts() {
 
 // 创建主窗口（设置页面）
 async function createWindow() {
+  // 如果窗口已经存在但被隐藏，则重新创建
+  if (mainWindow) {
+    // 如果窗口已经被销毁或为 null，则重新创建
+    if (mainWindow.isDestroyed() || mainWindow === null) {
+      mainWindow = null;
+    } else {
+      // 如果窗口存在但隐藏，显示窗口
+      mainWindow.show();
+      mainWindow.focus();
+      return;
+    }
+  }
+
   mainWindow = new BrowserWindow({
     width: 800,
     height: 600,
@@ -258,7 +278,7 @@ async function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: false,
-    },
+    }
   });
 
   try {
@@ -289,12 +309,23 @@ async function createWindow() {
       });
     }
     console.log('URL loaded successfully');
+
+    // 显示窗口
+    mainWindow.show();
+    mainWindow.focus();
   } catch (error) {
     console.error('Error loading main window:', error);
   }
 
+  // 监听窗口关闭事件
   mainWindow.on('closed', () => {
     mainWindow = null;
+  });
+
+  // 监听窗口隐藏事件
+  mainWindow.on('close', (event) => {
+    event.preventDefault(); // 阻止默认关闭行为
+    mainWindow?.hide(); // 隐藏窗口而不是关闭
   });
 }
 
@@ -391,8 +422,16 @@ app.whenReady().then(async () => {
   registerShortcuts();
 
   app.on('activate', async () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
+    // 如果没有窗口，或者所有窗口都被隐藏，则创建窗口
+    if (BrowserWindow.getAllWindows().length === 0 || 
+        BrowserWindow.getAllWindows().every(window => !window.isVisible())) {
       await createWindow();
+    } else {
+      // 尝试显示主窗口
+      if (mainWindow) {
+        mainWindow.show();
+        mainWindow.focus();
+      }
     }
   });
 

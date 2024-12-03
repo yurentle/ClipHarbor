@@ -95,6 +95,11 @@ function registerIpcHandlers() {
   electron.ipcMain.handle("get-default-shortcut", () => {
     return process.platform === "darwin" ? "Command+Shift+V" : "Ctrl+Shift+V";
   });
+  electron.ipcMain.handle("close-history-window", () => {
+    if (historyWindow) {
+      historyWindow.hide();
+    }
+  });
 }
 function broadcastClipboardChange(item) {
   if (mainWindow) {
@@ -217,6 +222,15 @@ function registerShortcuts() {
   }
 }
 async function createWindow() {
+  if (mainWindow) {
+    if (mainWindow.isDestroyed() || mainWindow === null) {
+      mainWindow = null;
+    } else {
+      mainWindow.show();
+      mainWindow.focus();
+      return;
+    }
+  }
   mainWindow = new electron.BrowserWindow({
     width: 800,
     height: 600,
@@ -251,11 +265,17 @@ async function createWindow() {
       });
     }
     console.log("URL loaded successfully");
+    mainWindow.show();
+    mainWindow.focus();
   } catch (error) {
     console.error("Error loading main window:", error);
   }
   mainWindow.on("closed", () => {
     mainWindow = null;
+  });
+  mainWindow.on("close", (event) => {
+    event.preventDefault();
+    mainWindow == null ? void 0 : mainWindow.hide();
   });
 }
 function startClipboardMonitoring() {
@@ -335,8 +355,13 @@ electron.app.whenReady().then(async () => {
   await createWindow();
   registerShortcuts();
   electron.app.on("activate", async () => {
-    if (electron.BrowserWindow.getAllWindows().length === 0) {
+    if (electron.BrowserWindow.getAllWindows().length === 0 || electron.BrowserWindow.getAllWindows().every((window) => !window.isVisible())) {
       await createWindow();
+    } else {
+      if (mainWindow) {
+        mainWindow.show();
+        mainWindow.focus();
+      }
     }
   });
   startClipboardMonitoring();

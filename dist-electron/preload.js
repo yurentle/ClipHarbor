@@ -14,5 +14,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
   toggleFavorite: (id) => ipcRenderer.invoke("toggle-favorite", id),
   toggleDock: (show) => ipcRenderer.invoke("toggle-dock", show),
   toggleTray: (show) => ipcRenderer.invoke("toggle-tray", show),
-  getDefaultShortcut: () => ipcRenderer.invoke("get-default-shortcut")
+  getDefaultShortcut: () => ipcRenderer.invoke("get-default-shortcut"),
+  closeHistoryWindow: () => ipcRenderer.invoke("close-history-window")
 });

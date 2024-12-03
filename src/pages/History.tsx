@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { ActionIcon, Box, Card, Container, Group, ScrollArea, SegmentedControl, Stack, Text, TextInput, Tooltip, Image, Folder } from '@mantine/core'
-import { Copy, Heart, Search, Trash } from 'tabler-icons-react'
+import { ActionIcon, Box, Card, Container, Group, ScrollArea, SegmentedControl, Stack, Text, TextInput, Tooltip, Image } from '@mantine/core'
+import { Copy, Heart, Search, Trash, Folder } from 'tabler-icons-react'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import 'dayjs/locale/zh-cn'
@@ -48,6 +48,7 @@ function History() {
 
   const handleCopy = async (item: ClipboardItem) => {
     await window.electronAPI.saveToClipboard(item)
+    await window.electronAPI.closeHistoryWindow()
   }
 
   const handleRemove = async (id: string) => {
@@ -68,6 +69,10 @@ function History() {
     } catch (error) {
       console.error('Failed to toggle favorite:', error)
     }
+  }
+
+  const handleDoubleClick = async (item: ClipboardItem) => {
+    await handleCopy(item)
   }
 
   // 过滤历史记录
@@ -201,7 +206,7 @@ function History() {
               shadow="sm"
               padding="sm"
               className="card-hover"
-              onDoubleClick={() => handleCopy(item)}
+              onDoubleClick={() => handleDoubleClick(item)}
               style={{ 
                 cursor: 'pointer', 
                 width: '100%',
