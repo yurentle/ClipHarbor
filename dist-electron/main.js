@@ -284,7 +284,7 @@ function startClipboardMonitoring() {
   console.log("Starting clipboard monitoring...");
   let lastContent = "";
   let lastImage = "";
-  setInterval(() => {
+  global.clipboardInterval = setInterval(() => {
     try {
       const filePaths = electron.clipboard.readBuffer("FileNameW");
       if (filePaths.length > 0) {
@@ -372,14 +372,18 @@ electron.app.whenReady().then(async () => {
   startClipboardMonitoring();
 });
 electron.app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    electron.app.quit();
-  }
+  electron.app.quit();
 });
 electron.app.on("will-quit", () => {
   electron.globalShortcut.unregisterAll();
 });
 electron.app.on("before-quit", () => {
+  if (global.clipboardInterval) {
+    clearInterval(global.clipboardInterval);
+  }
+  electron.BrowserWindow.getAllWindows().forEach((window) => {
+    window.destroy();
+  });
   mainWindow = null;
   historyWindow = null;
 });

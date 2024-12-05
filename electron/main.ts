@@ -3,6 +3,10 @@ import path from 'path';
 import Store from 'electron-store';
 import { v4 as uuidv4 } from 'uuid';
 
+declare global {
+  var clipboardInterval: NodeJS.Timeout | undefined;
+}
+
 // 定义剪贴板项的类型
 interface ClipboardItem {
   id: string
@@ -338,7 +342,7 @@ function startClipboardMonitoring() {
   let lastImage = '';
 
   // 每秒检查一次剪贴板变化
-  setInterval(() => {
+  global.clipboardInterval = setInterval(() => {
     try {
       // 检查是否有文件
       const filePaths = clipboard.readBuffer('FileNameW');
@@ -446,17 +450,28 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit()
-  }
+  // 在 macOS 上也退出应用
+  app.quit()
 })
 
+// 在应用退出前注销所有快捷键
 app.on('will-quit', () => {
   globalShortcut.unregisterAll()
 })
 
-// 当所有窗口关闭时，清理引用
+// 当应用退出前，清理资源
 app.on('before-quit', () => {
+  // 停止剪贴板监控
+  if (global.clipboardInterval) {
+    clearInterval(global.clipboardInterval)
+  }
+  
+  // 关闭所有窗口
+  BrowserWindow.getAllWindows().forEach(window => {
+    window.destroy()
+  })
+  
+  // 清理窗口引用
   mainWindow = null
   historyWindow = null
 })
