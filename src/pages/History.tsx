@@ -1,9 +1,23 @@
 import { useEffect, useState } from 'react'
-import { ActionIcon, Box, Card, Container, Group, ScrollArea, SegmentedControl, Stack, Text, TextInput, Tooltip, Image } from '@mantine/core'
+import { 
+  ActionIcon, 
+  Box, 
+  Card, 
+  Container, 
+  Group, 
+  ScrollArea, 
+  SegmentedControl, 
+  Stack, 
+  Text, 
+  TextInput, 
+  Tooltip, 
+  Image
+} from '@mantine/core'
 import { Copy, Heart, Search, Trash, Folder } from 'tabler-icons-react'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import 'dayjs/locale/zh-cn'
+import './history.css'
 
 // 配置 dayjs
 dayjs.extend(relativeTime)
@@ -207,10 +221,7 @@ function History() {
               radius="md"
               withBorder
               onDoubleClick={() => handleDoubleClick(item)}
-              style={{ 
-                cursor: 'pointer', 
-                width: '100%',
-              }}
+              className="history-card"
               styles={{
                 root: {
                   overflow: 'visible'

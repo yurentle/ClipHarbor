@@ -1,0 +1,14 @@
+.history-card {
+  overflow: visible;
+  background-color: transparent;
+  transition: all 200ms ease;
+  cursor: pointer;
+  margin: 0 4px;  /* 添加左右边距 */
+  width: calc(100% - 8px) !important;  /* 考虑边距调整宽度 */
+}
+
+.history-card:hover {
+  background-color: rgba(0, 0, 0, 0.03);
+  transform: scale(1.005);  /* 减小缩放比例 */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
