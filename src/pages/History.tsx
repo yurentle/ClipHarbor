@@ -202,27 +202,29 @@ function History() {
           filteredHistory.map((item) => (
             <Card
               key={item.id}
-              withBorder
               shadow="sm"
-              padding="sm"
-              className="card-hover"
+              padding="md"
+              radius="md"
+              withBorder
               onDoubleClick={() => handleDoubleClick(item)}
               style={{ 
                 cursor: 'pointer', 
                 width: '100%',
-                minHeight: '80px', // 增加最小高度
+              }}
+              styles={{
+                root: {
+                  overflow: 'visible'
+                }
               }}
             >
               <Group justify="space-between" align="start" style={{ height: '100%' }}>
-                <Box 
+                <div
                   style={{ 
-                    flex: 1, 
-                    overflow: 'hidden', 
-                    textOverflow: 'ellipsis' 
+                    flex: 1
                   }}
                 >
                   {renderContent(item)}
-                </Box>
+                </div>
                 <Group gap="xs" align="start">
                   <Tooltip label={item.favorite ? "取消收藏" : "收藏"}>
                     <ActionIcon
