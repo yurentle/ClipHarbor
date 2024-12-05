@@ -135,6 +135,7 @@ async function createHistoryWindow() {
   historyWindow = new BrowserWindow({
     width: 600,
     height: 800,
+    icon: path.join(__dirname, '../public/logo.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -271,8 +272,9 @@ async function createWindow() {
   }
 
   mainWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
+    width: 900,
+    height: 670,
+    icon: path.join(__dirname, '../public/logo.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -414,6 +416,10 @@ app.whenReady().then(async () => {
   
   // 注册 IPC 处理程序
   registerIpcHandlers();
+
+  if (process.platform === 'darwin') {
+    app.dock.setIcon(path.join(__dirname, '../public/logo.png'))
+  }
 
   // 创建主窗口
   await createWindow();

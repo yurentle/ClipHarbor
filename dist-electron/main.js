@@ -119,6 +119,7 @@ async function createHistoryWindow() {
   historyWindow = new electron.BrowserWindow({
     width: 600,
     height: 800,
+    icon: path.join(__dirname$1, "../public/logo.png"),
     webPreferences: {
       preload: path.join(__dirname$1, "preload.js"),
       nodeIntegration: false,
@@ -232,8 +233,9 @@ async function createWindow() {
     }
   }
   mainWindow = new electron.BrowserWindow({
-    width: 800,
-    height: 600,
+    width: 900,
+    height: 670,
+    icon: path.join(__dirname$1, "../public/logo.png"),
     webPreferences: {
       preload: path.join(__dirname$1, "preload.js"),
       nodeIntegration: false,
@@ -352,6 +354,9 @@ function startClipboardMonitoring() {
 electron.app.whenReady().then(async () => {
   console.log("App is ready, initializing...");
   registerIpcHandlers();
+  if (process.platform === "darwin") {
+    electron.app.dock.setIcon(path.join(__dirname$1, "../public/logo.png"));
+  }
   await createWindow();
   registerShortcuts();
   electron.app.on("activate", async () => {
