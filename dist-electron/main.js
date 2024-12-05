@@ -49,6 +49,7 @@ function getImageMetadata(dataUrl) {
 }
 let mainWindow = null;
 let historyWindow = null;
+let tray = null;
 function registerIpcHandlers() {
   electron.ipcMain.handle("get-clipboard-history", () => {
     return store.get("clipboardHistory", []);
@@ -353,6 +354,17 @@ function startClipboardMonitoring() {
 }
 electron.app.whenReady().then(async () => {
   console.log("App is ready, initializing...");
+  tray = new electron.Tray(path.join(__dirname$1, "../public/16.png"));
+  const contextMenu = electron.Menu.buildFromTemplate([
+    { label: "Show App", click: () => {
+      mainWindow == null ? void 0 : mainWindow.show();
+    } },
+    { label: "Quit", click: () => {
+      electron.app.quit();
+    } }
+  ]);
+  tray.setToolTip("ClipHarbor");
+  tray.setContextMenu(contextMenu);
   registerIpcHandlers();
   if (process.platform === "darwin") {
     electron.app.dock.setIcon(path.join(__dirname$1, "../public/logo.png"));
@@ -386,4 +398,5 @@ electron.app.on("before-quit", () => {
   });
   mainWindow = null;
   historyWindow = null;
+  tray = null;
 });

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, clipboard, ipcMain, nativeImage, globalShortcut } from 'electron';
+import { app, BrowserWindow, clipboard, ipcMain, nativeImage, globalShortcut, Tray, Menu } from 'electron';
 import path from 'path';
 import Store from 'electron-store';
 import { v4 as uuidv4 } from 'uuid';
@@ -44,6 +44,7 @@ function getImageMetadata(dataUrl: string): { width: number; height: number; siz
 
 let mainWindow: BrowserWindow | null = null
 let historyWindow: BrowserWindow | null = null
+let tray: Tray | null = null;
 
 // 注册所有的 IPC 处理程序
 function registerIpcHandlers() {
@@ -418,6 +419,15 @@ function startClipboardMonitoring() {
 app.whenReady().then(async () => {
   console.log('App is ready, initializing...');
   
+  // 设置 Tray 图标
+  tray = new Tray(path.join(__dirname, '../public/16.png'));
+  const contextMenu = Menu.buildFromTemplate([
+    { label: 'Show App', click: () => { mainWindow?.show(); } },
+    { label: 'Quit', click: () => { app.quit(); } }
+  ]);
+  tray.setToolTip('ClipHarbor');
+  tray.setContextMenu(contextMenu);
+
   // 注册 IPC 处理程序
   registerIpcHandlers();
 
@@ -474,4 +484,5 @@ app.on('before-quit', () => {
   // 清理窗口引用
   mainWindow = null
   historyWindow = null
+  tray = null;
 })
