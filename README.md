@@ -1,50 +1,37 @@
-# React + TypeScript + Vite
+# ClipHarbor
+[中文文档](./README_CN.md)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Welcome to ClipHarbor, a powerful clipboard management application built with Electron, React, and TypeScript. It helps you efficiently manage your clipboard history with ease and style.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Clipboard History**: Automatically saves your clipboard history, supporting text, images, and files.
+- **User-Friendly Interface**: Designed with a modern and responsive UI using Mantine UI.
+- **Cross-Platform Support**: Works seamlessly on macOS, Windows, and Linux.
+- **Customizable Settings**: Offers various configuration options to suit your preferences.
+- **Keyboard Shortcuts**: Quickly access your clipboard history with customizable shortcuts.
 
-## Expanding the ESLint configuration
+## Getting Started
 
-If you are developing a production application, we recommend updating the configuration to enable type aware lint rules:
+To get started with ClipHarbor, follow these steps:
 
-- Configure the top-level `parserOptions` property like this:
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/yourusername/clipharbor.git
+   cd clipharbor
+   ```
 
-```js
-export default tseslint.config({
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
-```
+2. **Install dependencies**:
+   ```bash
+   pnpm install
+   ```
 
-- Replace `tseslint.configs.recommended` to `tseslint.configs.recommendedTypeChecked` or `tseslint.configs.strictTypeChecked`
-- Optionally add `...tseslint.configs.stylisticTypeChecked`
-- Install [eslint-plugin-react](https://github.com/jsx-eslint/eslint-plugin-react) and update the config:
+3. **Run the application**:
+   ```bash
+   pnpm run dev
+   ```
 
-```js
-// eslint.config.js
-import react from 'eslint-plugin-react'
+## License
 
-export default tseslint.config({
-  // Set the react version
-  settings: { react: { version: '18.3' } },
-  plugins: {
-    // Add the react plugin
-    react,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended rules
-    ...react.configs.recommended.rules,
-    ...react.configs['jsx-runtime'].rules,
-  },
-})
-```
+ClipHarbor is licensed under the MIT License.
+
