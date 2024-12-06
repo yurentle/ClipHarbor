@@ -1,4 +1,4 @@
-interface ClipboardItem {
+export interface ClipboardItem {
   id: string
   content: string
   type: 'text' | 'image' | 'file'
@@ -11,7 +11,7 @@ interface ClipboardItem {
   }
 }
 
-interface ElectronAPI {
+export interface ElectronAPI {
   onClipboardChange: (callback: (content: ClipboardItem) => void) => () => void
   getClipboardHistory: () => Promise<ClipboardItem[]>
   saveToClipboard: (item: ClipboardItem) => Promise<boolean>
@@ -20,12 +20,7 @@ interface ElectronAPI {
   toggleDock: (show: boolean) => Promise<boolean>
   toggleTray: (show: boolean) => Promise<boolean>
   getDefaultShortcut: () => Promise<string>
+  closeHistoryWindow: () => Promise<void>
   toggleDockIcon: (show: boolean) => Promise<boolean>
   toggleTrayIcon: (show: boolean) => Promise<boolean>
-}
-
-declare global {
-  interface Window {
-    electron: ElectronAPI
-  }
 }

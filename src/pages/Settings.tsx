@@ -1,14 +1,12 @@
 import { useState, useEffect } from 'react';
 import { 
-  Tabs, 
-  Text, 
-  Switch, 
-  Stack, 
-  Container, 
-  TextInput, 
-  Button, 
-  Group, 
-  Paper, 
+  Tabs,
+  Text,
+  Switch,
+  Stack,
+  TextInput,
+  Button,
+  Group,
   useMantineTheme
 } from '@mantine/core';
 import { 
@@ -31,7 +29,7 @@ const Settings = () => {
     const init = async () => {
       try {
         // 获取默认快捷键
-        const defaultShortcut = await window.electron.getDefaultShortcut();
+        const defaultShortcut = await window.electronAPI.getDefaultShortcut();
         setShortcut(defaultShortcut);
       } catch (error) {
         console.error('Error initializing settings:', error);
@@ -45,29 +43,23 @@ const Settings = () => {
     height: '48px',
     justifyContent: 'flex-start',
     padding: '0 16px',
-    backgroundColor: activeTab === tabValue
-      ? (theme.colorScheme === 'dark'
-          ? theme.colors.dark[5]
-          : theme.colors.gray[1])
-      : 'transparent',
-    color: activeTab === tabValue
-      ? (theme.colorScheme === 'dark'
-          ? theme.white
-          : theme.colors.dark[9])
-      : theme.colorScheme === 'dark'
-        ? theme.colors.dark[1]
-        : theme.colors.gray[7],
+    backgroundColor: activeTab === tabValue ? 
+      theme.colors[theme.primaryColor][6] : 
+      'transparent',
+    color: activeTab === tabValue ? 
+      theme.white : 
+      theme.colors.gray[6],
     '&:hover': {
-      backgroundColor: theme.colorScheme === 'dark'
-        ? theme.colors.dark[6]
-        : theme.colors.gray[2]
+      backgroundColor: activeTab === tabValue ? 
+        theme.colors[theme.primaryColor][6] : 
+        theme.colors.gray[1]
     }
   });
 
   // 处理 Dock 图标显示切换
   const handleDockIconToggle = async (checked: boolean) => {
     try {
-      const result = await window.electron.toggleDockIcon(checked);
+      const result = await window.electronAPI.toggleDockIcon(checked);
       setShowDockIcon(result);
     } catch (error) {
       console.error('Error toggling dock icon:', error);
@@ -77,7 +69,7 @@ const Settings = () => {
   // 处理状态栏图标显示切换
   const handleTrayIconToggle = async (checked: boolean) => {
     try {
-      const result = await window.electron.toggleTrayIcon(checked);
+      const result = await window.electronAPI.toggleTrayIcon(checked);
       setShowTrayIcon(result);
     } catch (error) {
       console.error('Error toggling tray icon:', error);
@@ -99,11 +91,7 @@ const Settings = () => {
         <Tabs.List 
           style={{ 
             width: '200px', 
-            borderRight: `1px solid ${
-              theme.colorScheme === 'dark' 
-                ? theme.colors.dark[5] 
-                : theme.colors.gray[3]
-            }`,
+            borderRight: `1px solid ${theme.colors.gray[3]}`,
             padding: '8px 0'
           }}
         >

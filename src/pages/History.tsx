@@ -1,11 +1,9 @@
 import { useEffect, useState } from 'react'
 import { 
-  ActionIcon, 
-  Box, 
+  ActionIcon,
   Card, 
   Container, 
-  Group, 
-  ScrollArea, 
+  Group,
   SegmentedControl, 
   Stack, 
   Text, 
@@ -45,48 +43,64 @@ function History() {
   const [category, setCategory] = useState<CategoryType>('all')
 
   useEffect(() => {
-    // 获取历史记录
-    window.electronAPI.getClipboardHistory().then((history) => {
-      setClipboardHistory(history)
-    })
+    // 获取剪贴板历史
+    const fetchHistory = async () => {
+      try {
+        const history = await window.electronAPI.getClipboardHistory();
+        setClipboardHistory(history);
+      } catch (error) {
+        console.error('Error fetching clipboard history:', error);
+      }
+    };
+    fetchHistory();
 
     // 监听剪贴板变化
-    const unsubscribe = window.electronAPI.onClipboardChange((content) => {
-      setClipboardHistory(prev => [content, ...prev.filter(item => item.content !== content.content)].slice(0, 50))
-    })
+    const unsubscribe = window.electronAPI.onClipboardChange((newItem) => {
+      setClipboardHistory(prev => [newItem, ...prev.filter(item => item.content !== newItem.content)].slice(0, 50));
+    });
 
     return () => {
-      unsubscribe()
-    }
-  }, [])
+      unsubscribe();
+    };
+  }, []);
 
   const handleCopy = async (item: ClipboardItem) => {
-    await window.electronAPI.saveToClipboard(item)
-    await window.electronAPI.closeHistoryWindow()
+    try {
+      await window.electronAPI.saveToClipboard(item);
+      await window.electronAPI.closeHistoryWindow();
+    } catch (error) {
+      console.error('Error saving to clipboard:', error);
+    }
   }
 
   const handleRemove = async (id: string) => {
     try {
-      await window.electronAPI.removeFromHistory(id)
-      setClipboardHistory(prev => prev.filter(item => item.id !== id))
+      const success = await window.electronAPI.removeFromHistory(id);
+      if (success) {
+        setClipboardHistory(prev => prev.filter(item => item.id !== id));
+      }
     } catch (error) {
-      console.error('Failed to remove from history:', error)
+      console.error('Error removing from history:', error);
     }
   }
 
   const handleToggleFavorite = async (id: string) => {
     try {
-      await window.electronAPI.toggleFavorite(id)
-      setClipboardHistory(prev => prev.map(item =>
-        item.id === id ? { ...item, favorite: !item.favorite } : item
-      ))
+      const success = await window.electronAPI.toggleFavorite(id);
+      if (success) {
+        setClipboardHistory(prev => 
+          prev.map(item => 
+            item.id === id ? { ...item, favorite: !item.favorite } : item
+          )
+        );
+      }
     } catch (error) {
-      console.error('Failed to toggle favorite:', error)
+      console.error('Error toggling favorite:', error);
     }
   }
 
   const handleDoubleClick = async (item: ClipboardItem) => {
-    await handleCopy(item)
+    await handleCopy(item);
   }
 
   // 过滤历史记录

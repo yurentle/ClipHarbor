@@ -3,7 +3,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 // 为了 TypeScript 的类型检查
 declare global {
   interface Window {
-    electron: ElectronAPI
+    electronAPI: ElectronAPI
   }
 }
 
@@ -22,14 +22,18 @@ interface ElectronAPI {
 }
 
 // 使用 contextBridge 暴露 API
-contextBridge.exposeInMainWorld('electron', {
+contextBridge.exposeInMainWorld('electronAPI', {
   onClipboardChange: (callback: (content: any) => void) => {
-    const unsubscribe = ipcRenderer.on('clipboard-change', (_, content) => {
-      callback(content)
-    })
+    // 创建一个事件处理函数
+    const eventHandler = (_: any, content: any) => callback(content);
+    
+    // 添加事件监听器
+    ipcRenderer.on('clipboard-change', eventHandler);
+    
+    // 返回清理函数
     return () => {
-      unsubscribe()
-    }
+      ipcRenderer.removeListener('clipboard-change', eventHandler);
+    };
   },
   getClipboardHistory: () => ipcRenderer.invoke('get-clipboard-history'),
   saveToClipboard: (item: any) => ipcRenderer.invoke('save-to-clipboard', item),

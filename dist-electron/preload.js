@@ -1,12 +1,11 @@
 "use strict";
 const electron = require("electron");
-electron.contextBridge.exposeInMainWorld("electron", {
+electron.contextBridge.exposeInMainWorld("electronAPI", {
   onClipboardChange: (callback) => {
-    const unsubscribe = electron.ipcRenderer.on("clipboard-change", (_, content) => {
-      callback(content);
-    });
+    const eventHandler = (_, content) => callback(content);
+    electron.ipcRenderer.on("clipboard-change", eventHandler);
     return () => {
-      unsubscribe();
+      electron.ipcRenderer.removeListener("clipboard-change", eventHandler);
     };
   },
   getClipboardHistory: () => electron.ipcRenderer.invoke("get-clipboard-history"),
