@@ -54,6 +54,37 @@ function registerIpcHandlers() {
   electron.ipcMain.handle("get-clipboard-history", () => {
     return store.get("clipboardHistory", []);
   });
+  electron.ipcMain.handle("toggle-dock-icon", (_, show) => {
+    if (process.platform === "darwin") {
+      if (show) {
+        electron.app.dock.show().then(() => {
+          electron.app.dock.setIcon(path.join(__dirname$1, "../public/logo.png"));
+        });
+      } else {
+        electron.app.dock.hide();
+      }
+    }
+    return show;
+  });
+  electron.ipcMain.handle("toggle-tray-icon", (_, show) => {
+    if (show && !tray) {
+      tray = new electron.Tray(path.join(__dirname$1, "../public/16.png"));
+      const contextMenu = electron.Menu.buildFromTemplate([
+        { label: "Show App", click: () => {
+          mainWindow == null ? void 0 : mainWindow.show();
+        } },
+        { label: "Quit", click: () => {
+          electron.app.quit();
+        } }
+      ]);
+      tray.setToolTip("ClipHarbor");
+      tray.setContextMenu(contextMenu);
+    } else if (!show && tray) {
+      tray.destroy();
+      tray = null;
+    }
+    return show;
+  });
   electron.ipcMain.handle("save-to-clipboard", (_, item) => {
     if (item.type === "image") {
       const image = electron.clipboard.readImage().create(item.content);
@@ -239,8 +270,8 @@ async function createWindow() {
     }
   }
   mainWindow = new electron.BrowserWindow({
-    width: 900,
-    height: 670,
+    width: 700,
+    height: 480,
     icon: path.join(__dirname$1, "../public/logo.png"),
     webPreferences: {
       preload: path.join(__dirname$1, "preload.js"),

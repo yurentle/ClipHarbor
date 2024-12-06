@@ -20,8 +20,12 @@ interface ElectronAPI {
   toggleDock: (show: boolean) => Promise<boolean>
   toggleTray: (show: boolean) => Promise<boolean>
   getDefaultShortcut: () => Promise<string>
+  toggleDockIcon: (show: boolean) => Promise<boolean>
+  toggleTrayIcon: (show: boolean) => Promise<boolean>
 }
 
-declare interface Window {
-  electronAPI: ElectronAPI
-} 
+declare global {
+  interface Window {
+    electron: ElectronAPI
+  }
+}

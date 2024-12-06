@@ -23,14 +23,21 @@ import {
 const Settings = () => {
   const theme = useMantineTheme();
   const [activeTab, setActiveTab] = useState<string>('shortcuts');
-  const [showInDock, setShowInDock] = useState(true);
-  const [showInStatusBar, setShowInStatusBar] = useState(true);
+  const [showDockIcon, setShowDockIcon] = useState(true);
+  const [showTrayIcon, setShowTrayIcon] = useState(true);
   const [shortcut, setShortcut] = useState('');
 
   useEffect(() => {
-    window.electronAPI.getDefaultShortcut().then(defaultShortcut => {
-      setShortcut(defaultShortcut);
-    });
+    const init = async () => {
+      try {
+        // 获取默认快捷键
+        const defaultShortcut = await window.electron.getDefaultShortcut();
+        setShortcut(defaultShortcut);
+      } catch (error) {
+        console.error('Error initializing settings:', error);
+      }
+    };
+    init();
   }, []);
 
   const getTabStyle = (tabValue: string) => ({
@@ -57,13 +64,28 @@ const Settings = () => {
     }
   });
 
+  // 处理 Dock 图标显示切换
+  const handleDockIconToggle = async (checked: boolean) => {
+    try {
+      const result = await window.electron.toggleDockIcon(checked);
+      setShowDockIcon(result);
+    } catch (error) {
+      console.error('Error toggling dock icon:', error);
+    }
+  };
+
+  // 处理状态栏图标显示切换
+  const handleTrayIconToggle = async (checked: boolean) => {
+    try {
+      const result = await window.electron.toggleTrayIcon(checked);
+      setShowTrayIcon(result);
+    } catch (error) {
+      console.error('Error toggling tray icon:', error);
+    }
+  };
+
   return (
-    <div style={{ 
-      height: '100vh', 
-      width: '100%', 
-      display: 'flex', 
-      flexDirection: 'column' 
-    }}>
+    <div style={{ height: '100vh', padding: '20px' }}>
       <Tabs 
         value={activeTab} 
         onChange={(value) => setActiveTab(value || 'shortcuts')}
@@ -140,15 +162,13 @@ const Settings = () => {
             <Text fw={500}>显示设置</Text>
             <Switch
               label="在 Dock 栏显示图标"
-              checked={showInDock}
-              onChange={(event) => setShowInDock(event.currentTarget.checked)}
-              color="blue"
+              checked={showDockIcon}
+              onChange={(event) => handleDockIconToggle(event.currentTarget.checked)}
             />
             <Switch
               label="在状态栏显示图标"
-              checked={showInStatusBar}
-              onChange={(event) => setShowInStatusBar(event.currentTarget.checked)}
-              color="blue"
+              checked={showTrayIcon}
+              onChange={(event) => handleTrayIconToggle(event.currentTarget.checked)}
             />
           </Stack>
         </Tabs.Panel>

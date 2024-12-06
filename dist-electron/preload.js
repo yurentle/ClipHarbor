@@ -1,19 +1,22 @@
 "use strict";
-const { contextBridge, ipcRenderer } = require("electron");
-contextBridge.exposeInMainWorld("electronAPI", {
+const electron = require("electron");
+electron.contextBridge.exposeInMainWorld("electron", {
   onClipboardChange: (callback) => {
-    const subscription = (_event, content) => callback(content);
-    ipcRenderer.on("clipboard-change", subscription);
+    const unsubscribe = electron.ipcRenderer.on("clipboard-change", (_, content) => {
+      callback(content);
+    });
     return () => {
-      ipcRenderer.removeListener("clipboard-change", subscription);
+      unsubscribe();
     };
   },
-  getClipboardHistory: () => ipcRenderer.invoke("get-clipboard-history"),
-  saveToClipboard: (item) => ipcRenderer.invoke("save-to-clipboard", item),
-  removeFromHistory: (id) => ipcRenderer.invoke("remove-from-history", id),
-  toggleFavorite: (id) => ipcRenderer.invoke("toggle-favorite", id),
-  toggleDock: (show) => ipcRenderer.invoke("toggle-dock", show),
-  toggleTray: (show) => ipcRenderer.invoke("toggle-tray", show),
-  getDefaultShortcut: () => ipcRenderer.invoke("get-default-shortcut"),
-  closeHistoryWindow: () => ipcRenderer.invoke("close-history-window")
+  getClipboardHistory: () => electron.ipcRenderer.invoke("get-clipboard-history"),
+  saveToClipboard: (item) => electron.ipcRenderer.invoke("save-to-clipboard", item),
+  removeFromHistory: (id) => electron.ipcRenderer.invoke("remove-from-history", id),
+  toggleFavorite: (id) => electron.ipcRenderer.invoke("toggle-favorite", id),
+  toggleDock: (show) => electron.ipcRenderer.invoke("toggle-dock", show),
+  toggleTray: (show) => electron.ipcRenderer.invoke("toggle-tray", show),
+  getDefaultShortcut: () => electron.ipcRenderer.invoke("get-default-shortcut"),
+  closeHistoryWindow: () => electron.ipcRenderer.invoke("close-history-window"),
+  toggleDockIcon: (show) => electron.ipcRenderer.invoke("toggle-dock-icon", show),
+  toggleTrayIcon: (show) => electron.ipcRenderer.invoke("toggle-tray-icon", show)
 });

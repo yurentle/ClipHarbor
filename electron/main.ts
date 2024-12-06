@@ -53,6 +53,38 @@ function registerIpcHandlers() {
     return store.get('clipboardHistory', [])
   })
 
+  // 处理 Dock 显示设置
+  ipcMain.handle('toggle-dock-icon', (_, show: boolean) => {
+    if (process.platform === 'darwin') {
+      if (show) {
+        app.dock.show().then(() => {
+          // 显示后重新设置图标
+          app.dock.setIcon(path.join(__dirname, '../public/logo.png'));
+        });
+      } else {
+        app.dock.hide();
+      }
+    }
+    return show;
+  });
+
+  // 处理状态栏图标显示设置
+  ipcMain.handle('toggle-tray-icon', (_, show: boolean) => {
+    if (show && !tray) {
+      tray = new Tray(path.join(__dirname, '../public/16.png'));
+      const contextMenu = Menu.buildFromTemplate([
+        { label: 'Show App', click: () => { mainWindow?.show(); } },
+        { label: 'Quit', click: () => { app.quit(); } }
+      ]);
+      tray.setToolTip('ClipHarbor');
+      tray.setContextMenu(contextMenu);
+    } else if (!show && tray) {
+      tray.destroy();
+      tray = null;
+    }
+    return show;
+  });
+
   // 保存到剪贴板
   ipcMain.handle('save-to-clipboard', (_, item: ClipboardItem) => {
     if (item.type === 'image') {
@@ -284,8 +316,8 @@ async function createWindow() {
   }
 
   mainWindow = new BrowserWindow({
-    width: 900,
-    height: 670,
+    width: 700,
+    height: 480,
     icon: path.join(__dirname, '../public/logo.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
