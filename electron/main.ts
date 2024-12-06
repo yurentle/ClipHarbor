@@ -158,6 +158,13 @@ async function createHistoryWindow() {
 
   console.log('Loading URL for history window...');
 
+  // 添加 ESC 键监听
+  historyWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.key === 'Escape' && !input.alt && !input.control && !input.shift && !input.meta) {
+      historyWindow?.hide();
+    }
+  });
+
   // 返回一个 Promise，确保窗口完全加载
   return new Promise<void>(async (resolve, reject) => {
     try {

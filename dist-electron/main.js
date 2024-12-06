@@ -141,6 +141,11 @@ async function createHistoryWindow() {
     // 圆角窗口（仅在 macOS 上生效）
   });
   console.log("Loading URL for history window...");
+  historyWindow.webContents.on("before-input-event", (event, input) => {
+    if (input.key === "Escape" && !input.alt && !input.control && !input.shift && !input.meta) {
+      historyWindow == null ? void 0 : historyWindow.hide();
+    }
+  });
   return new Promise(async (resolve, reject) => {
     try {
       historyWindow.webContents.once("did-finish-load", () => {
