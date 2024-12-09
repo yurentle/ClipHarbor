@@ -24,9 +24,42 @@ interface ClipboardItem {
 const store = new Store({
   name: 'clipboard-history',
   defaults: {
-    clipboardHistory: []
+    clipboardHistory: [],
+    settings: {
+      shortcut: process.platform === 'darwin' ? 'Command+Shift+V' : 'Ctrl+Shift+V',
+      showDockIcon: true,
+      showTrayIcon: true
+    }
+  },
+  clearInvalidConfig: false, // 不清除无效配置
+  watch: true // 监听配置变化
+});
+
+// 创建日志函数
+function log(...args: any[]) {
+  const time = new Date().toISOString();
+  console.log(`[${time}]`, ...args);
+}
+
+// 创建 IPC 日志函数
+function ipcLog(...args: any[]) {
+  const time = new Date().toISOString();
+  console.log(`[${time}]`, ...args);
+  if (mainWindow) {
+    mainWindow.webContents.send('log', `[${time}] ${args.join(' ')}`);
   }
-})
+}
+
+// Debug: 打印初始配置
+log('Initial store settings:', JSON.stringify(store.get('settings'), null, 2));
+
+// 监听设置变化
+store.onDidChange('settings', (newValue, oldValue) => {
+  log('Settings changed:', 
+    '\nOld:', JSON.stringify(oldValue, null, 2),
+    '\nNew:', JSON.stringify(newValue, null, 2)
+  );
+});
 
 const __dirname = path.dirname(__filename)
 
@@ -45,6 +78,18 @@ function getImageMetadata(dataUrl: string): { width: number; height: number; siz
 let mainWindow: BrowserWindow | null = null
 let historyWindow: BrowserWindow | null = null
 let tray: Tray | null = null;
+
+// 注册快捷键处理函数
+function registerShortcutHandler() {
+  return () => {
+    if (historyWindow?.isVisible()) {
+      historyWindow.hide();
+    } else {
+      createHistoryWindow();
+      historyWindow?.show();
+    }
+  };
+}
 
 // 注册所有的 IPC 处理程序
 function registerIpcHandlers() {
@@ -65,6 +110,7 @@ function registerIpcHandlers() {
         app.dock.hide();
       }
     }
+    store.set('settings.showDockIcon', show);
     return show;
   });
 
@@ -82,6 +128,7 @@ function registerIpcHandlers() {
       tray.destroy();
       tray = null;
     }
+    store.set('settings.showTrayIcon', show);
     return show;
   });
 
@@ -123,6 +170,7 @@ function registerIpcHandlers() {
         app.dock.hide();
       }
     }
+    store.set('settings.showDockIcon', show);
     return true;
   });
 
@@ -131,13 +179,80 @@ function registerIpcHandlers() {
     if (tray) {
       tray.setVisible(show);
     }
+    store.set('settings.showTrayIcon', show);
     return true;
   });
 
-  // 获取默认快捷键
-  ipcMain.handle('get-default-shortcut', () => {
-    return process.platform === 'darwin' ? 'Command+Shift+V' : 'Ctrl+Shift+V'
+  const defaultShortcut = process.platform === 'darwin' ? 'Command+Shift+V' : 'Ctrl+Shift+V';
+  
+  // 获取设置的快捷键
+  ipcMain.handle('get-shortcut', () => {
+    log('Getting current shortcut');
+    const settings = store.get('settings');
+    const shortcut = settings?.shortcut || defaultShortcut;
+    log('Current shortcut:', shortcut);
+    return shortcut;
   })
+
+  // 处理设置快捷键
+  ipcMain.handle('set-shortcut', async (_, shortcut: string) => {
+    try {
+      log('Setting new shortcut:', shortcut);
+      
+      // 先注销所有快捷键
+      log('Unregistering all shortcuts');
+      globalShortcut.unregisterAll();
+      
+      if (shortcut === '') {
+        return false;
+      }
+      // 注册新的快捷键
+      log('Registering new shortcut:', shortcut);
+      const success = globalShortcut.register(shortcut, registerShortcutHandler());
+      log('New shortcut registration success:', success);
+      
+      // 检查快捷键是否已注册
+      log('Checking if new shortcut is registered');
+      const isRegistered = globalShortcut.isRegistered(shortcut);
+      log('Is new shortcut registered?', shortcut, ':', isRegistered);
+
+      if (!success) {
+        log('Failed to register new shortcut, reverting to default');
+        // 如果注册失败，重新注册默认快捷键
+        log('Registering default shortcut:', defaultShortcut);
+        const registered = globalShortcut.register(defaultShortcut, registerShortcutHandler());
+        log('Default shortcut registration:', registered);
+        
+        store.set('settings', {
+          ...store.get('settings'),
+          shortcut: defaultShortcut
+        });
+        return false;
+      }
+
+      // 保存新的快捷键
+      log('Saving new shortcut');
+      const currentSettings = store.get('settings') || {};
+      const newSettings = {
+        ...currentSettings,
+        shortcut: shortcut
+      };
+      store.set('settings', newSettings);
+      
+      log('New settings saved:', store.get('settings'));
+      return true;
+    } catch (error) {
+      log('Error setting shortcut:', error);
+      // 如果出错，重新注册默认快捷键
+      log('Registering default shortcut:', defaultShortcut);
+      globalShortcut.register(defaultShortcut, registerShortcutHandler());
+      store.set('settings', {
+        ...store.get('settings'),
+        shortcut: defaultShortcut
+      });
+      return false;
+    }
+  });
 
   // 关闭历史窗口
   ipcMain.handle('close-history-window', () => {
@@ -145,7 +260,67 @@ function registerIpcHandlers() {
       historyWindow.hide()
     }
   })
+
+  // 处理注销快捷键的 IPC 请求
+  ipcMain.on('unregister-shortcut', () => {
+    globalShortcut.unregisterAll();
+    console.log('All shortcuts unregistered');
+  });
 }
+
+// 注册快捷键
+function registerShortcuts() {
+  const defaultShortcut = process.platform === 'darwin' ? 'Command+Shift+V' : 'Ctrl+Shift+V';
+  
+  // Debug: 打印 store 中的所有数据
+  log('All store data:', JSON.stringify(store.store, null, 2));
+  
+  const settings = store.get('settings');
+  log('Current settings:', JSON.stringify(settings, null, 2));
+  
+  const currentShortcut = settings?.shortcut || defaultShortcut;
+  log('Using shortcut:', currentShortcut);
+  
+  // 注销所有已注册的快捷键
+  log('Unregistering all shortcuts');
+  globalShortcut.unregisterAll();
+  
+  try {
+    // 注册保存的快捷键
+    log('Registering shortcut:', currentShortcut);
+    const success = globalShortcut.register(currentShortcut, registerShortcutHandler());
+    log('Shortcut registration success:', success);
+    
+    // 检查快捷键是否已注册
+    log('Checking if shortcut is registered');
+    const isRegistered = globalShortcut.isRegistered(currentShortcut);
+    log('Is shortcut registered?', currentShortcut, ':', isRegistered);
+    
+    // 如果注册失败，使用默认快捷键
+    if (!success) {
+      log('Failed to register saved shortcut, trying default:', defaultShortcut);
+      log('Registering default shortcut:', defaultShortcut);
+      const registered = globalShortcut.register(defaultShortcut, registerShortcutHandler());
+      log('Default shortcut registration:', registered);
+      
+      if (registered) {
+        const currentSettings = store.get('settings') || {};
+        store.set('settings', {
+          ...currentSettings,
+          shortcut: defaultShortcut
+        });
+        log('Default shortcut registered and saved');
+      } else {
+        log('Failed to register default shortcut');
+      }
+    }
+  } catch (error) {
+    log('Error during shortcut registration:', error);
+  }
+}
+
+// 存储当前快捷键
+let currentShortcut = process.platform === 'darwin' ? 'Command+Shift+V' : 'Ctrl+Shift+V';
 
 // 广播剪贴板变化到所有窗口
 function broadcastClipboardChange(item: ClipboardItem) {
@@ -253,51 +428,6 @@ async function createHistoryWindow() {
       reject(error);
     }
   });
-}
-
-// 注册快捷键
-function registerShortcuts() {
-  console.log('Registering shortcuts...');
-  
-  // 先注销所有快捷键
-  globalShortcut.unregisterAll();
-  console.log('All shortcuts unregistered');
-  
-  const shortcut = process.platform === 'darwin' ? 'CommandOrControl+Shift+V' : 'CommandOrControl+Shift+V';
-  console.log('Attempting to register shortcut:', shortcut);
-  
-  try {
-    const registered = globalShortcut.register(shortcut, async () => {
-      console.log('Shortcut triggered! Creating/showing history window...');
-      
-      try {
-        if (!historyWindow) {
-          console.log('No history window exists, creating new one...');
-          await createHistoryWindow();
-        } else {
-          console.log('History window exists, showing it...');
-          historyWindow.show();
-          historyWindow.focus();
-          historyWindow.setAlwaysOnTop(true);
-          setTimeout(() => {
-            if (historyWindow) {
-              historyWindow.setAlwaysOnTop(false);
-            }
-          }, 300);
-        }
-      } catch (error) {
-        console.error('Error handling shortcut:', error);
-      }
-    });
-
-    if (!registered) {
-      console.error('快捷键注册失败:', shortcut);
-    } else {
-      console.log('快捷键注册成功:', shortcut);
-    }
-  } catch (error) {
-    console.error('注册快捷键时出错:', error);
-  }
 }
 
 // 创建主窗口（设置页面）
@@ -458,6 +588,15 @@ function startClipboardMonitoring() {
 app.whenReady().then(async () => {
   console.log('App is ready, initializing...');
   
+  // 注册 IPC 处理程序
+  registerIpcHandlers();
+  
+  // 注册快捷键
+  registerShortcuts();
+  
+  // 创建主窗口
+  await createWindow();
+  
   // 设置 Tray 图标
   tray = new Tray(path.join(__dirname, '../public/16.png'));
   const contextMenu = Menu.buildFromTemplate([
@@ -466,62 +605,48 @@ app.whenReady().then(async () => {
   ]);
   tray.setToolTip('ClipHarbor');
   tray.setContextMenu(contextMenu);
-
-  // 注册 IPC 处理程序
-  registerIpcHandlers();
-
+  
+  // 开始监听剪贴板
+  startClipboardMonitoring();
+  
   if (process.platform === 'darwin') {
-    app.dock.setIcon(path.join(__dirname, '../public/logo.png'))
+    app.dock.setIcon(path.join(__dirname, '../public/logo.png'));
   }
 
-  // 创建主窗口
-  await createWindow();
-  
-  // 注册快捷键
-  registerShortcuts();
-
   app.on('activate', async () => {
-    // 如果没有窗口，或者所有窗口都被隐藏，则创建窗口
-    if (BrowserWindow.getAllWindows().length === 0 || 
-        BrowserWindow.getAllWindows().every(window => !window.isVisible())) {
+    if (!mainWindow) {
       await createWindow();
     } else {
-      // 尝试显示主窗口
-      if (mainWindow) {
-        mainWindow.show();
-        mainWindow.focus();
-      }
+      mainWindow.show();
     }
   });
 
-  // 开始监听剪贴板变化
-  startClipboardMonitoring();
+  // 在应用退出前注销所有快捷键
+  app.on('will-quit', () => {
+    globalShortcut.unregisterAll();
+  });
+
+  // 当应用退出前，清理资源
+  app.on('before-quit', () => {
+    // 停止剪贴板监控
+    if (global.clipboardInterval) {
+      clearInterval(global.clipboardInterval);
+    }
+    
+    // 关闭所有窗口
+    BrowserWindow.getAllWindows().forEach(window => {
+      window.destroy();
+    });
+    
+    // 清理窗口引用
+    mainWindow = null;
+    historyWindow = null;
+    tray = null;
+  });
 });
 
 app.on('window-all-closed', () => {
-  // 在 macOS 上也退出应用
-  app.quit()
-})
-
-// 在应用退出前注销所有快捷键
-app.on('will-quit', () => {
-  globalShortcut.unregisterAll()
-})
-
-// 当应用退出前，清理资源
-app.on('before-quit', () => {
-  // 停止剪贴板监控
-  if (global.clipboardInterval) {
-    clearInterval(global.clipboardInterval)
+  if (process.platform !== 'darwin') {
+    app.quit();
   }
-  
-  // 关闭所有窗口
-  BrowserWindow.getAllWindows().forEach(window => {
-    window.destroy()
-  })
-  
-  // 清理窗口引用
-  mainWindow = null
-  historyWindow = null
-  tray = null;
-})
+});

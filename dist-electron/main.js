@@ -33,8 +33,31 @@ function v4(options, buf, offset) {
 const store = new Store({
   name: "clipboard-history",
   defaults: {
-    clipboardHistory: []
-  }
+    clipboardHistory: [],
+    settings: {
+      shortcut: process.platform === "darwin" ? "Command+Shift+V" : "Ctrl+Shift+V",
+      showDockIcon: true,
+      showTrayIcon: true
+    }
+  },
+  clearInvalidConfig: false,
+  // 不清除无效配置
+  watch: true
+  // 监听配置变化
+});
+function log(...args) {
+  const time = (/* @__PURE__ */ new Date()).toISOString();
+  console.log(`[${time}]`, ...args);
+}
+log("Initial store settings:", JSON.stringify(store.get("settings"), null, 2));
+store.onDidChange("settings", (newValue, oldValue) => {
+  log(
+    "Settings changed:",
+    "\nOld:",
+    JSON.stringify(oldValue, null, 2),
+    "\nNew:",
+    JSON.stringify(newValue, null, 2)
+  );
 });
 const __dirname$1 = path.dirname(__filename);
 function getImageMetadata(dataUrl) {
@@ -50,6 +73,16 @@ function getImageMetadata(dataUrl) {
 let mainWindow = null;
 let historyWindow = null;
 let tray = null;
+function registerShortcutHandler() {
+  return () => {
+    if (historyWindow == null ? void 0 : historyWindow.isVisible()) {
+      historyWindow.hide();
+    } else {
+      createHistoryWindow();
+      historyWindow == null ? void 0 : historyWindow.show();
+    }
+  };
+}
 function registerIpcHandlers() {
   electron.ipcMain.handle("get-clipboard-history", () => {
     return store.get("clipboardHistory", []);
@@ -64,6 +97,7 @@ function registerIpcHandlers() {
         electron.app.dock.hide();
       }
     }
+    store.set("settings.showDockIcon", show);
     return show;
   });
   electron.ipcMain.handle("toggle-tray-icon", (_, show) => {
@@ -83,6 +117,7 @@ function registerIpcHandlers() {
       tray.destroy();
       tray = null;
     }
+    store.set("settings.showTrayIcon", show);
     return show;
   });
   electron.ipcMain.handle("save-to-clipboard", (_, item) => {
@@ -116,23 +151,116 @@ function registerIpcHandlers() {
         electron.app.dock.hide();
       }
     }
+    store.set("settings.showDockIcon", show);
     return true;
   });
   electron.ipcMain.handle("toggle-tray", async (_, show) => {
     if (tray) {
       tray.setVisible(show);
     }
+    store.set("settings.showTrayIcon", show);
     return true;
   });
-  electron.ipcMain.handle("get-default-shortcut", () => {
-    return process.platform === "darwin" ? "Command+Shift+V" : "Ctrl+Shift+V";
+  const defaultShortcut = process.platform === "darwin" ? "Command+Shift+V" : "Ctrl+Shift+V";
+  electron.ipcMain.handle("get-shortcut", () => {
+    log("Getting current shortcut");
+    const settings = store.get("settings");
+    const shortcut = (settings == null ? void 0 : settings.shortcut) || defaultShortcut;
+    log("Current shortcut:", shortcut);
+    return shortcut;
+  });
+  electron.ipcMain.handle("set-shortcut", async (_, shortcut) => {
+    try {
+      log("Setting new shortcut:", shortcut);
+      log("Unregistering all shortcuts");
+      electron.globalShortcut.unregisterAll();
+      if (shortcut === "") {
+        return false;
+      }
+      log("Registering new shortcut:", shortcut);
+      const success = electron.globalShortcut.register(shortcut, registerShortcutHandler());
+      log("New shortcut registration success:", success);
+      log("Checking if new shortcut is registered");
+      const isRegistered = electron.globalShortcut.isRegistered(shortcut);
+      log("Is new shortcut registered?", shortcut, ":", isRegistered);
+      if (!success) {
+        log("Failed to register new shortcut, reverting to default");
+        log("Registering default shortcut:", defaultShortcut);
+        const registered = electron.globalShortcut.register(defaultShortcut, registerShortcutHandler());
+        log("Default shortcut registration:", registered);
+        store.set("settings", {
+          ...store.get("settings"),
+          shortcut: defaultShortcut
+        });
+        return false;
+      }
+      log("Saving new shortcut");
+      const currentSettings = store.get("settings") || {};
+      const newSettings = {
+        ...currentSettings,
+        shortcut
+      };
+      store.set("settings", newSettings);
+      log("New settings saved:", store.get("settings"));
+      return true;
+    } catch (error) {
+      log("Error setting shortcut:", error);
+      log("Registering default shortcut:", defaultShortcut);
+      electron.globalShortcut.register(defaultShortcut, registerShortcutHandler());
+      store.set("settings", {
+        ...store.get("settings"),
+        shortcut: defaultShortcut
+      });
+      return false;
+    }
   });
   electron.ipcMain.handle("close-history-window", () => {
     if (historyWindow) {
       historyWindow.hide();
     }
   });
+  electron.ipcMain.on("unregister-shortcut", () => {
+    electron.globalShortcut.unregisterAll();
+    console.log("All shortcuts unregistered");
+  });
 }
+function registerShortcuts() {
+  const defaultShortcut = process.platform === "darwin" ? "Command+Shift+V" : "Ctrl+Shift+V";
+  log("All store data:", JSON.stringify(store.store, null, 2));
+  const settings = store.get("settings");
+  log("Current settings:", JSON.stringify(settings, null, 2));
+  const currentShortcut2 = (settings == null ? void 0 : settings.shortcut) || defaultShortcut;
+  log("Using shortcut:", currentShortcut2);
+  log("Unregistering all shortcuts");
+  electron.globalShortcut.unregisterAll();
+  try {
+    log("Registering shortcut:", currentShortcut2);
+    const success = electron.globalShortcut.register(currentShortcut2, registerShortcutHandler());
+    log("Shortcut registration success:", success);
+    log("Checking if shortcut is registered");
+    const isRegistered = electron.globalShortcut.isRegistered(currentShortcut2);
+    log("Is shortcut registered?", currentShortcut2, ":", isRegistered);
+    if (!success) {
+      log("Failed to register saved shortcut, trying default:", defaultShortcut);
+      log("Registering default shortcut:", defaultShortcut);
+      const registered = electron.globalShortcut.register(defaultShortcut, registerShortcutHandler());
+      log("Default shortcut registration:", registered);
+      if (registered) {
+        const currentSettings = store.get("settings") || {};
+        store.set("settings", {
+          ...currentSettings,
+          shortcut: defaultShortcut
+        });
+        log("Default shortcut registered and saved");
+      } else {
+        log("Failed to register default shortcut");
+      }
+    }
+  } catch (error) {
+    log("Error during shortcut registration:", error);
+  }
+}
+process.platform === "darwin" ? "Command+Shift+V" : "Ctrl+Shift+V";
 function broadcastClipboardChange(item) {
   if (mainWindow) {
     mainWindow.webContents.send("clipboard-change", item);
@@ -221,43 +349,6 @@ async function createHistoryWindow() {
       reject(error);
     }
   });
-}
-function registerShortcuts() {
-  console.log("Registering shortcuts...");
-  electron.globalShortcut.unregisterAll();
-  console.log("All shortcuts unregistered");
-  const shortcut = process.platform === "darwin" ? "CommandOrControl+Shift+V" : "CommandOrControl+Shift+V";
-  console.log("Attempting to register shortcut:", shortcut);
-  try {
-    const registered = electron.globalShortcut.register(shortcut, async () => {
-      console.log("Shortcut triggered! Creating/showing history window...");
-      try {
-        if (!historyWindow) {
-          console.log("No history window exists, creating new one...");
-          await createHistoryWindow();
-        } else {
-          console.log("History window exists, showing it...");
-          historyWindow.show();
-          historyWindow.focus();
-          historyWindow.setAlwaysOnTop(true);
-          setTimeout(() => {
-            if (historyWindow) {
-              historyWindow.setAlwaysOnTop(false);
-            }
-          }, 300);
-        }
-      } catch (error) {
-        console.error("Error handling shortcut:", error);
-      }
-    });
-    if (!registered) {
-      console.error("快捷键注册失败:", shortcut);
-    } else {
-      console.log("快捷键注册成功:", shortcut);
-    }
-  } catch (error) {
-    console.error("注册快捷键时出错:", error);
-  }
 }
 async function createWindow() {
   if (mainWindow) {
@@ -390,6 +481,9 @@ function startClipboardMonitoring() {
 }
 electron.app.whenReady().then(async () => {
   console.log("App is ready, initializing...");
+  registerIpcHandlers();
+  registerShortcuts();
+  await createWindow();
   tray = new electron.Tray(path.join(__dirname$1, "../public/16.png"));
   const contextMenu = electron.Menu.buildFromTemplate([
     { label: "Show App", click: () => {
@@ -401,38 +495,34 @@ electron.app.whenReady().then(async () => {
   ]);
   tray.setToolTip("ClipHarbor");
   tray.setContextMenu(contextMenu);
-  registerIpcHandlers();
+  startClipboardMonitoring();
   if (process.platform === "darwin") {
     electron.app.dock.setIcon(path.join(__dirname$1, "../public/logo.png"));
   }
-  await createWindow();
-  registerShortcuts();
   electron.app.on("activate", async () => {
-    if (electron.BrowserWindow.getAllWindows().length === 0 || electron.BrowserWindow.getAllWindows().every((window) => !window.isVisible())) {
+    if (!mainWindow) {
       await createWindow();
     } else {
-      if (mainWindow) {
-        mainWindow.show();
-        mainWindow.focus();
-      }
+      mainWindow.show();
     }
   });
-  startClipboardMonitoring();
+  electron.app.on("will-quit", () => {
+    electron.globalShortcut.unregisterAll();
+  });
+  electron.app.on("before-quit", () => {
+    if (global.clipboardInterval) {
+      clearInterval(global.clipboardInterval);
+    }
+    electron.BrowserWindow.getAllWindows().forEach((window) => {
+      window.destroy();
+    });
+    mainWindow = null;
+    historyWindow = null;
+    tray = null;
+  });
 });
 electron.app.on("window-all-closed", () => {
-  electron.app.quit();
-});
-electron.app.on("will-quit", () => {
-  electron.globalShortcut.unregisterAll();
-});
-electron.app.on("before-quit", () => {
-  if (global.clipboardInterval) {
-    clearInterval(global.clipboardInterval);
+  if (process.platform !== "darwin") {
+    electron.app.quit();
   }
-  electron.BrowserWindow.getAllWindows().forEach((window) => {
-    window.destroy();
-  });
-  mainWindow = null;
-  historyWindow = null;
-  tray = null;
 });

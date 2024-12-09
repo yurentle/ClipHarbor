@@ -24,12 +24,13 @@ const Settings = () => {
   const [showDockIcon, setShowDockIcon] = useState(true);
   const [showTrayIcon, setShowTrayIcon] = useState(true);
   const [shortcut, setShortcut] = useState('');
+  const [shortcutError, setShortcutError] = useState('');
+  const [isInputFocused, setIsInputFocused] = useState(false);
 
   useEffect(() => {
     const init = async () => {
       try {
-        // 获取默认快捷键
-        const defaultShortcut = await window.electronAPI.getDefaultShortcut();
+        const defaultShortcut = await window.electronAPI.getShortcut();
         setShortcut(defaultShortcut);
       } catch (error) {
         console.error('Error initializing settings:', error);
@@ -56,7 +57,51 @@ const Settings = () => {
     }
   });
 
-  // 处理 Dock 图标显示切换
+  // 处理快捷键录入
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    e.preventDefault();
+    
+    // 记录按下的键
+    const key = e.key === ' ' ? 'Space' : e.key;
+    // 更新显示的快捷键
+    const modifiers = [];
+    if (e.metaKey) modifiers.push('Command');
+    if (e.ctrlKey) modifiers.push('Ctrl');
+    if (e.altKey) modifiers.push('Alt');
+    if (e.shiftKey) modifiers.push('Shift');
+
+    const displayKey = key.length === 1 ? key.toUpperCase() : key;
+    if (!['Meta', 'Control', 'Alt', 'Shift'].includes(key)) {
+      modifiers.push(displayKey);
+    }
+
+    setShortcut(modifiers.join('+'));
+  };
+
+  const handleBlur = async () => {
+    // 当输入框失去焦点时设置新的快捷键
+    if (shortcut.split('+').length > 1) {
+      try {
+        const success = await window.electronAPI.setShortcut(shortcut);
+        if (!success) {
+          setShortcutError('无效的快捷键组合');
+        } else {
+          setShortcut(shortcut); // 更新显示的快捷键
+          setShortcutError('');
+        }
+      } catch (error) {
+        console.error('Error saving shortcut:', error);
+        setShortcutError('保存快捷键失败');
+      }
+    } else {
+      setShortcutError('请至少设置两个按键的组合');
+    }
+  };
+
+  const handleKeyUp = (e: React.KeyboardEvent) => {
+    // 记录松开的键
+  };
+
   const handleDockIconToggle = async (checked: boolean) => {
     try {
       const result = await window.electronAPI.toggleDockIcon(checked);
@@ -66,7 +111,6 @@ const Settings = () => {
     }
   };
 
-  // 处理状态栏图标显示切换
   const handleTrayIconToggle = async (checked: boolean) => {
     try {
       const result = await window.electronAPI.toggleTrayIcon(checked);
@@ -126,14 +170,19 @@ const Settings = () => {
             padding: '16px' 
           }}
         >
-          <Stack>
-            <Text fw={500}>快捷键设置</Text>
+          <Stack spacing="md">
+            <Text size="lg" weight={500}>快捷键设置</Text>
             <TextInput
-              label="呼出剪贴板历史"
+              label=""
+              placeholder={isInputFocused ? '请按下快捷键组合...' : '点击此处设置快捷键'}
               value={shortcut}
+              error={shortcutError}
+              onFocus={() => setIsInputFocused(true)}
+              onBlur={handleBlur}
+              onKeyDown={handleKeyDown}
+              onKeyUp={handleKeyUp}
               readOnly
-              description="默认快捷键，用于呼出剪贴板历史记录"
-              variant="filled"
+              style={{ maxWidth: '400px' }}
             />
           </Stack>
         </Tabs.Panel>
@@ -146,8 +195,8 @@ const Settings = () => {
             padding: '16px' 
           }}
         >
-          <Stack>
-            <Text fw={500}>显示设置</Text>
+          <Stack spacing="md">
+            <Text size="lg" weight={500}>显示设置</Text>
             <Switch
               label="在 Dock 栏显示图标"
               checked={showDockIcon}
