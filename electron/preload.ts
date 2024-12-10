@@ -15,7 +15,7 @@ interface ElectronAPI {
   toggleFavorite: (id: string) => Promise<boolean>
   toggleDock: (show: boolean) => Promise<boolean>
   toggleTray: (show: boolean) => Promise<boolean>
-  getDefaultShortcut: () => Promise<string>
+  getShortcut: () => Promise<string>
   setShortcut: (shortcut: string) => Promise<boolean>
   closeHistoryWindow: () => Promise<void>
   toggleDockIcon: (show: boolean) => Promise<boolean>
@@ -42,7 +42,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   toggleFavorite: (id: string) => ipcRenderer.invoke('toggle-favorite', id),
   toggleDock: (show: boolean) => ipcRenderer.invoke('toggle-dock', show),
   toggleTray: (show: boolean) => ipcRenderer.invoke('toggle-tray', show),
-  getDefaultShortcut: () => ipcRenderer.invoke('get-default-shortcut'),
+  getShortcut: () => ipcRenderer.invoke('get-shortcut'),
   setShortcut: (shortcut: string) => ipcRenderer.invoke('set-shortcut', shortcut),
   closeHistoryWindow: () => ipcRenderer.invoke('close-history-window'),
   toggleDockIcon: (show: boolean) => ipcRenderer.invoke('toggle-dock-icon', show),

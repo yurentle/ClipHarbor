@@ -19,7 +19,7 @@ export interface ElectronAPI {
   toggleFavorite: (id: string) => Promise<boolean>
   toggleDock: (show: boolean) => Promise<boolean>
   toggleTray: (show: boolean) => Promise<boolean>
-  getDefaultShortcut: () => Promise<string>
+  getShortcut: () => Promise<string>
   setShortcut: (shortcut: string) => Promise<boolean>
   closeHistoryWindow: () => Promise<void>
   toggleDockIcon: (show: boolean) => Promise<boolean>
