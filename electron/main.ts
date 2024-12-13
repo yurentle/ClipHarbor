@@ -104,7 +104,7 @@ function registerIpcHandlers() {
       if (show) {
         app.dock.show().then(() => {
           // 显示后重新设置图标
-          app.dock.setIcon(path.join(__dirname, '../public/logo.png'));
+          app.dock.setIcon(path.join(__dirname, '../public/logo_dock.png'));
         });
       } else {
         app.dock.hide();
@@ -117,7 +117,7 @@ function registerIpcHandlers() {
   // 处理状态栏图标显示设置
   ipcMain.handle('toggle-tray-icon', (_, show: boolean) => {
     if (show && !tray) {
-      tray = new Tray(path.join(__dirname, '../public/16.png'));
+      tray = new Tray(path.join(__dirname, '../public/logo_tray.png'));
       const contextMenu = Menu.buildFromTemplate([
         { label: 'Show App', click: () => { mainWindow?.show(); } },
         { label: 'Quit', click: () => { app.quit(); } }
@@ -347,7 +347,7 @@ async function createHistoryWindow() {
   historyWindow = new BrowserWindow({
     width: 600,
     height: 800,
-    icon: path.join(__dirname, '../public/logo.png'),
+    icon: path.join(__dirname, '../public/logo_dock.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -448,7 +448,7 @@ async function createWindow() {
   mainWindow = new BrowserWindow({
     width: 700,
     height: 480,
-    icon: path.join(__dirname, '../public/logo.png'),
+    icon: path.join(__dirname, '../public/logo_dock.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -598,7 +598,7 @@ app.whenReady().then(async () => {
   await createWindow();
   
   // 设置 Tray 图标
-  tray = new Tray(path.join(__dirname, '../public/16.png'));
+  tray = new Tray(path.join(__dirname, '../public/logo_tray.png'));
   const contextMenu = Menu.buildFromTemplate([
     { label: 'Show App', click: () => { mainWindow?.show(); } },
     { label: 'Quit', click: () => { app.quit(); } }
@@ -610,7 +610,7 @@ app.whenReady().then(async () => {
   startClipboardMonitoring();
   
   if (process.platform === 'darwin') {
-    app.dock.setIcon(path.join(__dirname, '../public/logo.png'));
+    app.dock.setIcon(path.join(__dirname, '../public/logo_dock.png'));
   }
 
   app.on('activate', async () => {
