@@ -24,4 +24,6 @@ export interface ElectronAPI {
   closeHistoryWindow: () => Promise<void>
   toggleDockIcon: (show: boolean) => Promise<boolean>
   toggleTrayIcon: (show: boolean) => Promise<boolean>
+  getStoreValue: (key: string) => Promise<any>
+  setStoreValue: (key: string, value: any) => Promise<boolean>
 }

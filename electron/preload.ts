@@ -20,6 +20,8 @@ interface ElectronAPI {
   closeHistoryWindow: () => Promise<void>
   toggleDockIcon: (show: boolean) => Promise<boolean>
   toggleTrayIcon: (show: boolean) => Promise<boolean>
+  getStoreValue: (key: string) => Promise<any>
+  setStoreValue: (key: string, value: any) => Promise<boolean>
 }
 
 // 使用 contextBridge 暴露 API
@@ -46,5 +48,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setShortcut: (shortcut: string) => ipcRenderer.invoke('set-shortcut', shortcut),
   closeHistoryWindow: () => ipcRenderer.invoke('close-history-window'),
   toggleDockIcon: (show: boolean) => ipcRenderer.invoke('toggle-dock-icon', show),
-  toggleTrayIcon: (show: boolean) => ipcRenderer.invoke('toggle-tray-icon', show)
+  toggleTrayIcon: (show: boolean) => ipcRenderer.invoke('toggle-tray-icon', show),
+  getStoreValue: (key: string) => ipcRenderer.invoke('getStoreValue', key),
+  setStoreValue: (key: string, value: any) => ipcRenderer.invoke('setStoreValue', key, value)
 } as ElectronAPI)

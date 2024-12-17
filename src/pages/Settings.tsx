@@ -5,9 +5,11 @@ import {
   Switch,
   Stack,
   TextInput,
+  NumberInput,
   Button,
   Group,
-  useMantineTheme
+  useMantineTheme,
+  Select
 } from '@mantine/core';
 import { 
   Settings as SettingsIcon, 
@@ -15,8 +17,10 @@ import {
   InfoCircle,
   BrandGithub,
   Mail,
-  BrandTwitter
+  History
 } from 'tabler-icons-react';
+
+type Period = 'days' | 'months' | 'years' | 'permanent';
 
 const Settings = () => {
   const theme = useMantineTheme();
@@ -26,6 +30,8 @@ const Settings = () => {
   const [shortcut, setShortcut] = useState('');
   const [shortcutError, setShortcutError] = useState('');
   const [isInputFocused, setIsInputFocused] = useState(false);
+  const [retentionPeriod, setRetentionPeriod] = useState<number>(30);
+  const [retentionUnit, setRetentionUnit] = useState<'days' | 'months' | 'years' | 'permanent'>('days');
 
   useEffect(() => {
     const init = async () => {
@@ -37,6 +43,21 @@ const Settings = () => {
       }
     };
     init();
+  }, []);
+
+  useEffect(() => {
+    // Load saved retention settings
+    const loadRetentionSettings = async () => {
+      try {
+        const period = await window.electronAPI.getStoreValue('retentionPeriod');
+        const unit = await window.electronAPI.getStoreValue('retentionUnit');
+        if (period !== undefined) setRetentionPeriod(period);
+        if (unit !== undefined) setRetentionUnit(unit);
+      } catch (error) {
+        console.error('Failed to load retention settings:', error);
+      }
+    };
+    loadRetentionSettings();
   }, []);
 
   const getTabStyle = (tabValue: string) => ({
@@ -57,7 +78,6 @@ const Settings = () => {
     }
   });
 
-  // 处理快捷键录入
   const handleKeyDown = (e: React.KeyboardEvent) => {
     e.preventDefault();
     
@@ -120,13 +140,24 @@ const Settings = () => {
     }
   };
 
+  const handleRetentionChange = async (value: number, unit: Period) => {
+    setRetentionPeriod(value);
+    setRetentionUnit(unit);
+    try {
+      await window.electronAPI.setStoreValue('retentionPeriod', value);
+      await window.electronAPI.setStoreValue('retentionUnit', unit);
+    } catch (error) {
+      console.error('Failed to save retention settings:', error);
+    }
+  };
+
   return (
     <div style={{ height: '100vh', padding: '20px' }}>
       <Tabs 
         value={activeTab} 
         onChange={(value) => setActiveTab(value || 'shortcuts')}
         orientation="vertical"
-        style={{ 
+        style={{
           flex: 1, 
           display: 'flex', 
           overflow: 'hidden' 
@@ -145,6 +176,13 @@ const Settings = () => {
             styles={{ tab: getTabStyle('shortcuts') }}
           >
             快捷键
+          </Tabs.Tab>
+          <Tabs.Tab 
+            value="history" 
+            leftSection={<History size={20} />}
+            styles={{ tab: getTabStyle('history') }}
+          >
+            历史记录
           </Tabs.Tab>
           <Tabs.Tab 
             value="appearance" 
@@ -170,8 +208,8 @@ const Settings = () => {
             padding: '16px' 
           }}
         >
-          <Stack spacing="md">
-            <Text size="lg" weight={500}>快捷键设置</Text>
+          <Stack>
+            <Text size="lg">快捷键设置</Text>
             <TextInput
               label=""
               placeholder={isInputFocused ? '请按下快捷键组合...' : '点击此处设置快捷键'}
@@ -188,6 +226,47 @@ const Settings = () => {
         </Tabs.Panel>
 
         <Tabs.Panel 
+          value="history" 
+          style={{ 
+            flex: 1, 
+            overflowY: 'auto', 
+            padding: '16px' 
+          }}
+        >
+          <Stack>
+            <Text size="sm">保留时长设置</Text>
+            <Group>
+              {retentionUnit !== 'permanent' && (
+                <NumberInput
+                  style={{ width: 100 }}
+                  value={retentionPeriod}
+                  allowNegative={false}
+                  allowDecimal={false}
+                  onChange={(value) => handleRetentionChange(value as number, retentionUnit)}
+                  min={0}
+                />
+              )}
+              <Select
+                style={{ width: 120 }}
+                value={retentionUnit}
+                onChange={(value) => {
+                  handleRetentionChange(value === 'permanent' ? 0 : retentionPeriod, value as Period);
+                }}
+                data={[
+                  { value: 'days', label: '天' },
+                  { value: 'months', label: '月' },
+                  { value: 'years', label: '年' },
+                  { value: 'permanent', label: '永久' }
+                ]}
+              />
+            </Group>
+            <Text size="xs" color="dimmed">
+              设置为0或选择永久将永久保存历史记录
+            </Text>
+          </Stack>
+        </Tabs.Panel>
+
+        <Tabs.Panel 
           value="appearance" 
           style={{ 
             flex: 1, 
@@ -195,8 +274,8 @@ const Settings = () => {
             padding: '16px' 
           }}
         >
-          <Stack spacing="md">
-            <Text size="lg" weight={500}>显示设置</Text>
+          <Stack>
+            <Text size="lg">显示设置</Text>
             <Switch
               label="在 Dock 栏显示图标"
               checked={showDockIcon}
@@ -231,7 +310,7 @@ const Settings = () => {
                 variant="light" 
                 leftSection={<BrandGithub size={16} />}
                 component="a"
-                href="https://github.com/yourusername/clipboard-manager"
+                href="https://github.com/yurentle/ClipHarbor"
                 target="_blank"
               >
                 GitHub
@@ -240,18 +319,9 @@ const Settings = () => {
                 variant="light" 
                 leftSection={<Mail size={16} />}
                 component="a"
-                href="mailto:support@clipboardmanager.com"
+                href="mailto:yurentle@gmail.com"
               >
                 联系我们
-              </Button>
-              <Button 
-                variant="light" 
-                leftSection={<BrandTwitter size={16} />}
-                component="a"
-                href="https://twitter.com/yourusername"
-                target="_blank"
-              >
-                Twitter
               </Button>
             </Group>
           </Stack>

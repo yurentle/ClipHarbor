@@ -28,7 +28,9 @@ const store = new Store({
     settings: {
       shortcut: process.platform === 'darwin' ? 'Command+Shift+V' : 'Ctrl+Shift+V',
       showDockIcon: true,
-      showTrayIcon: true
+      showTrayIcon: true,
+      retentionPeriod: 30,
+      retentionUnit: 'days'
     }
   },
   clearInvalidConfig: false, // 不清除无效配置
@@ -265,6 +267,30 @@ function registerIpcHandlers() {
   ipcMain.on('unregister-shortcut', () => {
     globalShortcut.unregisterAll();
     console.log('All shortcuts unregistered');
+  });
+
+  // 通用的获取存储值的处理程序
+  ipcMain.handle('getStoreValue', (_, key: string) => {
+    try {
+      const value = store.get(`settings.${key}`);
+      log(`Getting store value for ${key}:`, value);
+      return value;
+    } catch (error) {
+      log(`Error getting store value for ${key}:`, error);
+      return undefined;
+    }
+  });
+
+  // 通用的设置存储值的处理程序
+  ipcMain.handle('setStoreValue', (_, key: string, value: any) => {
+    try {
+      store.set(`settings.${key}`, value);
+      log(`Setting store value for ${key}:`, value);
+      return true;
+    } catch (error) {
+      log(`Error setting store value for ${key}:`, error);
+      return false;
+    }
   });
 }
 
