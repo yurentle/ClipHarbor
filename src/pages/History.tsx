@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { 
   ActionIcon,
   Card, 
@@ -9,7 +9,8 @@ import {
   Text, 
   TextInput, 
   Tooltip, 
-  Image
+  Image,
+  ScrollArea
 } from '@mantine/core'
 import { Copy, Heart, Search, Trash, Folder } from 'tabler-icons-react'
 import dayjs from 'dayjs'
@@ -36,33 +37,129 @@ interface ClipboardItem {
 }
 
 type CategoryType = 'all' | 'text' | 'image' | 'file' | 'favorite'
+type Period = 'days' | 'months' | 'years' | 'permanent'
+
+const ITEMS_PER_PAGE = 20;
 
 function History() {
+  const viewport = useRef<HTMLDivElement>(null);
   const [clipboardHistory, setClipboardHistory] = useState<ClipboardItem[]>([])
+  const [filteredHistory, setFilteredHistory] = useState<ClipboardItem[]>([])
+  const [displayedHistory, setDisplayedHistory] = useState<ClipboardItem[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [category, setCategory] = useState<CategoryType>('all')
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(true)
+  const [retentionPeriod, setRetentionPeriod] = useState<number>(30)
+  const [retentionUnit, setRetentionUnit] = useState<Period>('days')
 
+  // 加载更多
+  const loadMore = () => {
+    const nextPage = page + 1;
+    const start = (nextPage - 1) * ITEMS_PER_PAGE;
+    const end = start + ITEMS_PER_PAGE;
+    const newItems = filteredHistory.slice(start, end);
+    
+    setDisplayedHistory(prev => [...prev, ...newItems]);
+    setPage(nextPage);
+    setHasMore(end < filteredHistory.length);
+  };
+
+  const handleScroll = (position: {x: number, y: number}) => {
+    const { scrollTop, scrollHeight, clientHeight } = viewport.current!;
+    // console.log('onscroll', position, {scrollHeight, scrollTop, clientHeight});
+    if (scrollHeight - scrollTop - clientHeight < 50) {
+      console.log('onreatchbottom');
+      if (!hasMore) return;
+      loadMore();
+    }
+  };
+
+  // 根据保存时间过滤历史记录
+  const filterByRetentionPeriod = (items: ClipboardItem[]) => {
+    if (retentionUnit === 'permanent') return items;
+    
+    const now = dayjs();
+    const cutoffTime = now.subtract(retentionPeriod, retentionUnit).valueOf();
+    
+    return items.filter(item => 
+      item.favorite || item.timestamp >= cutoffTime
+    );
+  };
+
+  // 加载保存时间设置
   useEffect(() => {
-    // 获取剪贴板历史
+    const loadRetentionSettings = async () => {
+      try {
+        const period = await window.electronAPI.getStoreValue('retentionPeriod');
+        const unit = await window.electronAPI.getStoreValue('retentionUnit');
+        if (period !== undefined) setRetentionPeriod(period);
+        if (unit !== undefined) setRetentionUnit(unit as Period);
+      } catch (error) {
+        console.error('Failed to load retention settings:', error);
+      }
+    };
+    loadRetentionSettings();
+  }, []);
+
+  // 获取剪贴板历史
+  useEffect(() => {
     const fetchHistory = async () => {
       try {
+        // setLoading(true);
         const history = await window.electronAPI.getClipboardHistory();
-        setClipboardHistory(history);
+        console.log('history', history);
+        const filteredByTime = filterByRetentionPeriod(history);
+        setClipboardHistory(filteredByTime);
       } catch (error) {
         console.error('Error fetching clipboard history:', error);
+      } finally {
+        // setLoading(false);
       }
     };
     fetchHistory();
 
     // 监听剪贴板变化
     const unsubscribe = window.electronAPI.onClipboardChange((newItem) => {
-      setClipboardHistory(prev => [newItem, ...prev.filter(item => item.content !== newItem.content)].slice(0, 50));
+      setClipboardHistory(prev => {
+        const newHistory = [newItem, ...prev.filter(item => item.content !== newItem.content)];
+        return filterByRetentionPeriod(newHistory);
+      });
     });
 
     return () => {
       unsubscribe();
     };
-  }, []);
+  }, [retentionPeriod, retentionUnit]);
+
+  // 根据搜索和分类过滤历史记录
+  useEffect(() => {
+    let filtered = clipboardHistory;
+
+    // 应用搜索过滤
+    if (searchQuery) {
+      filtered = filtered.filter(item => {
+        if (item.type === 'text') {
+          return item.content.toLowerCase().includes(searchQuery.toLowerCase());
+        }
+        return false;
+      });
+    }
+
+    // 应用分类过滤
+    if (category !== 'all') {
+      if (category === 'favorite') {
+        filtered = filtered.filter(item => item.favorite);
+      } else {
+        filtered = filtered.filter(item => item.type === category);
+      }
+    }
+
+    setFilteredHistory(filtered);
+    setPage(1);
+    setDisplayedHistory(filtered.slice(0, ITEMS_PER_PAGE));
+    setHasMore(filtered.length > ITEMS_PER_PAGE);
+  }, [clipboardHistory, searchQuery, category]);
 
   const handleCopy = async (item: ClipboardItem) => {
     try {
@@ -102,15 +199,6 @@ function History() {
   const handleDoubleClick = async (item: ClipboardItem) => {
     await handleCopy(item);
   }
-
-  // 过滤历史记录
-  const filteredHistory = clipboardHistory.filter(item => {
-    const matchesCategory = category === 'all' || 
-                          (category === 'favorite' && item.favorite) || 
-                          category === item.type
-    const matchesSearch = item.content.toLowerCase().includes(searchQuery.toLowerCase())
-    return matchesCategory && matchesSearch
-  })
 
   const renderContent = (item: ClipboardItem) => {
     const timeAgo = dayjs(item.timestamp).fromNow()
@@ -187,14 +275,16 @@ function History() {
   }
 
   return (
-    <Container p="xs" style={{ 
-      backgroundColor: 'rgba(255, 255, 255, 0.95)', 
-      height: '100vh',
-      display: 'flex',
-      flexDirection: 'column',
-      borderRadius: '10px',
-      WebkitAppRegion: 'drag', // 允许拖动窗口
-    }}>
+    <Container p="xs" 
+      style={{ 
+        backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+        height: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        borderRadius: '10px',
+        WebkitAppRegion: 'drag', // 允许拖动窗口
+      }}
+    >
       <Group justify="space-between" mb="md" style={{ WebkitAppRegion: 'no-drag' }}> {/* 搜索区域不可拖动 */}
         <TextInput
           placeholder="搜索剪贴板历史..."
@@ -215,24 +305,27 @@ function History() {
           ]}
         />
       </Group>
-      <Stack 
-        gap="xs" 
+      <ScrollArea 
+        type="always" 
+        scrollbars="y"
+        // h={500}
+        viewportRef={viewport}
+        onScrollPositionChange={handleScroll}
         style={{ 
-          flex: 1, 
-          overflowY: 'auto',
-          WebkitAppRegion: 'no-drag',
-          paddingRight: '8px' // 为滚动条留出空间
+          width: '100%',
+          WebkitAppRegion: 'no-drag'
         }}
       >
-        {filteredHistory.length === 0 ? (
+        {displayedHistory.length === 0 ? (
           <Text c="dimmed" ta="center" pt="xl">没有找到相关记录</Text>
         ) : (
-          filteredHistory.map((item) => (
+          displayedHistory.map((item) => (
             <Card
               key={item.id}
               shadow="sm"
               padding="md"
               radius="md"
+              mb={'md'}
               withBorder
               onDoubleClick={() => handleDoubleClick(item)}
               className="history-card"
@@ -286,7 +379,7 @@ function History() {
             </Card>
           ))
         )}
-      </Stack>
+      </ScrollArea>
     </Container>
   )
 }

@@ -555,7 +555,7 @@ function startClipboardMonitoring() {
               timestamp: Date.now(),
               favorite: false
             }
-            const newHistory = [newItem, ...history.filter(item => item.content !== newItem.content)].slice(0, 50);
+            const newHistory = [newItem, ...history.filter(item => item.content !== newItem.content)];
             store.set('clipboardHistory', newHistory);
             broadcastClipboardChange(newItem);
           }
@@ -581,7 +581,7 @@ function startClipboardMonitoring() {
             favorite: false,
             metadata
           }
-          const newHistory = [newItem, ...history.filter(i => i.content !== dataUrl)].slice(0, 50);
+          const newHistory = [newItem, ...history.filter(i => i.content !== dataUrl)];
           store.set('clipboardHistory', newHistory);
           broadcastClipboardChange(newItem);
         }
@@ -598,7 +598,7 @@ function startClipboardMonitoring() {
             timestamp: Date.now(),
             favorite: false
           }
-          const newHistory = [newItem, ...history.filter(i => i.content !== newItem.content)].slice(0, 50);
+          const newHistory = [newItem, ...history.filter(i => i.content !== newItem.content)];
           store.set('clipboardHistory', newHistory);
           broadcastClipboardChange(newItem);
         }
