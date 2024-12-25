@@ -22,6 +22,10 @@ interface ElectronAPI {
   toggleTrayIcon: (show: boolean) => Promise<boolean>
   getStoreValue: (key: string) => Promise<any>
   setStoreValue: (key: string, value: any) => Promise<boolean>
+  syncData: (config: string) => Promise<boolean>
+  syncDataFromCloud: (config: string) => Promise<boolean>
+  openStoreDirectory: () => Promise<void>
+  getHistoryFilePath: () => Promise<string>
 }
 
 // 使用 contextBridge 暴露 API
@@ -49,6 +53,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   closeHistoryWindow: () => ipcRenderer.invoke('close-history-window'),
   toggleDockIcon: (show: boolean) => ipcRenderer.invoke('toggle-dock-icon', show),
   toggleTrayIcon: (show: boolean) => ipcRenderer.invoke('toggle-tray-icon', show),
-  getStoreValue: (key: string) => ipcRenderer.invoke('getStoreValue', key),
-  setStoreValue: (key: string, value: any) => ipcRenderer.invoke('setStoreValue', key, value)
+  getStoreValue: (key: string) => ipcRenderer.invoke('get-store-value', key),
+  setStoreValue: (key: string, value: any) => ipcRenderer.invoke('set-store-value', key, value),
+  syncData: (config: string) => ipcRenderer.invoke('sync-data', config),
+  syncDataFromCloud: (config: string) => ipcRenderer.invoke('sync-data-from-cloud', config),
+  openStoreDirectory: () => ipcRenderer.invoke('open-store-directory'),
+  getHistoryFilePath: () => ipcRenderer.invoke('get-history-file-path')
 } as ElectronAPI)

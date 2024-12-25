@@ -1,7 +1,10 @@
-import { app, BrowserWindow, clipboard, ipcMain, nativeImage, globalShortcut, Tray, Menu } from 'electron';
+import { app, BrowserWindow, clipboard, ipcMain, nativeImage, globalShortcut, Tray, Menu, shell } from 'electron';
 import path from 'path';
 import Store from 'electron-store';
 import { v4 as uuidv4 } from 'uuid';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+import fs from 'fs';
 
 declare global {
   var clipboardInterval: NodeJS.Timeout | undefined;
@@ -36,6 +39,11 @@ const store = new Store({
   clearInvalidConfig: false, // 不清除无效配置
   watch: true // 监听配置变化
 });
+
+// 打印存储路径
+log('Store path:', store.path);
+
+const historyFileName = 'clipboard-history.json';
 
 // 创建日志函数
 function log(...args: any[]) {
@@ -270,7 +278,7 @@ function registerIpcHandlers() {
   });
 
   // 通用的获取存储值的处理程序
-  ipcMain.handle('getStoreValue', (_, key: string) => {
+  ipcMain.handle('get-store-value', (_, key: string) => {
     try {
       const value = store.get(`settings.${key}`);
       log(`Getting store value for ${key}:`, value);
@@ -282,7 +290,7 @@ function registerIpcHandlers() {
   });
 
   // 通用的设置存储值的处理程序
-  ipcMain.handle('setStoreValue', (_, key: string, value: any) => {
+  ipcMain.handle('set-store-value', (_, key: string, value: any) => {
     try {
       store.set(`settings.${key}`, value);
       log(`Setting store value for ${key}:`, value);
@@ -292,6 +300,107 @@ function registerIpcHandlers() {
       return false;
     }
   });
+
+  // 获取历史记录文件路径
+  ipcMain.handle('get-history-file-path', () => {
+    const localPath = app.getPath('userData');
+    const localFile = path.join(localPath, historyFileName);
+    return localFile;
+  });
+
+  // 同步数据到云端
+  ipcMain.handle('sync-data', async (event, rcloneConfig: string) => {
+    if (!rcloneConfig) {
+      throw new Error('请提供 Rclone 配置');
+    }
+
+    // 保存配置
+    await store.set('settings.rcloneConfig', rcloneConfig);
+    log('Saved Rclone config:', rcloneConfig);
+    const execFileAsync = promisify(execFile);
+    const localPath = app.getPath('userData');
+    const localFile = path.join(localPath, historyFileName);
+
+    try {
+      // 确保本地数据文件存在
+      if (!fs.existsSync(localFile)) {
+        // 如果文件不存在，创建一个包含空历史记录的文件
+        const initialData = {
+          clipboardHistory: store.get('clipboardHistory', [])
+        };
+        await fs.promises.mkdir(path.dirname(localFile), { recursive: true });
+        await fs.promises.writeFile(localFile, JSON.stringify(initialData, null, 2));
+      }
+
+      // 验证文件是否可读
+      try {
+        await fs.promises.access(localFile, fs.constants.R_OK);
+      } catch (error) {
+        throw new Error('无法读取本地数据文件，请检查文件权限');
+      }
+
+      // 使用 rclone 复制文件到云端
+      await execFileAsync('rclone', ['copy', localFile, rcloneConfig]);
+      return true;
+    } catch (error: any) {
+      if (error.code === 'ENOENT' && error.path === 'rclone') {
+        throw new Error('未安装 rclone，请先安装 rclone 并配置远程存储');
+      }
+      
+      // 提供更详细的错误信息
+      const errorMessage = error.message || '未知错误';
+      if (errorMessage.includes('directory not found')) {
+        throw new Error('本地数据文件不存在或无法访问，请确保应用有权限访问该目录');
+      }
+      throw new Error(`同步失败: ${errorMessage}`);
+    }
+  });
+
+  // 从云端同步数据到本地
+  ipcMain.handle('sync-data-from-cloud', async (event, rcloneConfig: string) => {
+    if (!rcloneConfig) {
+      throw new Error('请提供 Rclone 配置');
+    }
+
+    const execFileAsync = promisify(execFile);
+    const localPath = app.getPath('userData');
+    const localFile = path.join(localPath, historyFileName);
+
+    try {
+      // 确保本地目录存在
+      await fs.promises.mkdir(path.dirname(localFile), { recursive: true });
+
+      // 使用 rclone 从云端复制文件到本地
+      await execFileAsync('rclone', ['copy', rcloneConfig, localPath]);
+      
+      try {
+        // 读取并验证同步的数据
+        const data = await fs.promises.readFile(localFile, 'utf-8');
+        const parsedData = JSON.parse(data);
+        
+        if (Array.isArray(parsedData.clipboardHistory)) {
+          store.set('clipboardHistory', parsedData.clipboardHistory);
+        } else {
+          throw new Error('同步的数据格式无效');
+        }
+      } catch (parseError) {
+        throw new Error('无法解析同步的数据，可能是文件格式错误');
+      }
+      
+      return true;
+    } catch (error: any) {
+      if (error.code === 'ENOENT' && error.path === 'rclone') {
+        throw new Error('未安装 rclone，请先安装 rclone 并配置远程存储');
+      }
+      throw new Error(`同步失败: ${error.message}`);
+    }
+  });
+
+  // 打开存储目录
+  ipcMain.handle('open-store-directory', () => {
+    const localPath = app.getPath('userData');
+    shell.openPath(localPath);
+  });
 }
 
 // 注册快捷键
@@ -299,7 +408,7 @@ function registerShortcuts() {
   const defaultShortcut = process.platform === 'darwin' ? 'Command+Shift+V' : 'Ctrl+Shift+V';
   
   // Debug: 打印 store 中的所有数据
-  log('All store data:', JSON.stringify(store.store, null, 2));
+  // log('All store data:', JSON.stringify(store.store, null, 2));
   
   const settings = store.get('settings');
   log('Current settings:', JSON.stringify(settings, null, 2));

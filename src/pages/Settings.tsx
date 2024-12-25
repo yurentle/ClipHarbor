@@ -11,13 +11,17 @@ import {
   useMantineTheme,
   Select
 } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import { 
   Settings as SettingsIcon, 
   Keyboard, 
   InfoCircle,
   BrandGithub,
   Mail,
-  History
+  History,
+  Database,
+  CloudUpload,
+  Download
 } from 'tabler-icons-react';
 
 type Period = 'days' | 'months' | 'years' | 'permanent';
@@ -31,7 +35,11 @@ const Settings = () => {
   const [shortcutError, setShortcutError] = useState('');
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [retentionPeriod, setRetentionPeriod] = useState<number>(30);
-  const [retentionUnit, setRetentionUnit] = useState<'days' | 'months' | 'years' | 'permanent'>('days');
+  const [retentionUnit, setRetentionUnit] = useState<Period>('days');
+  const [rcloneConfig, setRcloneConfig] = useState('');
+  const [syncing, setSyncing] = useState(false);
+  const [syncingLocal, setSyncingLocal] = useState(false);
+  const [historyFilePath, setHistoryFilePath] = useState('');
 
   useEffect(() => {
     const init = async () => {
@@ -46,7 +54,6 @@ const Settings = () => {
   }, []);
 
   useEffect(() => {
-    // Load saved retention settings
     const loadRetentionSettings = async () => {
       try {
         const period = await window.electronAPI.getStoreValue('retentionPeriod');
@@ -58,6 +65,20 @@ const Settings = () => {
       }
     };
     loadRetentionSettings();
+  }, []);
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const config = await window.electronAPI.getStoreValue('rcloneConfig');
+        const filePath = await window.electronAPI.getHistoryFilePath();
+        if (config) setRcloneConfig(config);
+        if (filePath) setHistoryFilePath(filePath);
+      } catch (error) {
+        console.error('Failed to load settings:', error);
+      }
+    };
+    loadSettings();
   }, []);
 
   const getTabStyle = (tabValue: string) => ({
@@ -151,6 +172,64 @@ const Settings = () => {
     }
   };
 
+  const handleSyncToCloud = async () => {
+    if (!rcloneConfig) {
+      notifications.show({
+        title: '同步失败',
+        message: '请先配置 Rclone',
+        color: 'red'
+      });
+      return;
+    }
+
+    setSyncing(true);
+    try {
+      await window.electronAPI.syncData(rcloneConfig);
+      notifications.show({
+        title: '同步成功',
+        message: '数据已成功同步到云端',
+        color: 'green'
+      });
+    } catch (error: any) {
+      notifications.show({
+        title: '同步失败111',
+        message: error.message || '同步数据时发生错误',
+        color: 'red'
+      });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleSyncToLocal = async () => {
+    if (!rcloneConfig) {
+      notifications.show({
+        title: '同步失败',
+        message: '请先配置 Rclone',
+        color: 'red'
+      });
+      return;
+    }
+
+    setSyncingLocal(true);
+    try {
+      await window.electronAPI.syncDataFromCloud(rcloneConfig);
+      notifications.show({
+        title: '同步成功',
+        message: '云端数据已成功同步到本地',
+        color: 'green'
+      });
+    } catch (error: any) {
+      notifications.show({
+        title: '同步失败',
+        message: error.message || '同步数据时发生错误',
+        color: 'red'
+      });
+    } finally {
+      setSyncingLocal(false);
+    }
+  };
+
   return (
     <div style={{ height: '100vh', padding: '20px' }}>
       <Tabs 
@@ -165,7 +244,7 @@ const Settings = () => {
       >
         <Tabs.List 
           style={{ 
-            width: '200px', 
+            width: '160px', 
             borderRight: `1px solid ${theme.colors.gray[3]}`,
             padding: '8px 0'
           }}
@@ -183,6 +262,13 @@ const Settings = () => {
             styles={{ tab: getTabStyle('history') }}
           >
             历史记录
+          </Tabs.Tab>
+          <Tabs.Tab 
+            value="storage" 
+            leftSection={<Database size={20} />}
+            styles={{ tab: getTabStyle('storage') }}
+          >
+            数据存储
           </Tabs.Tab>
           <Tabs.Tab 
             value="appearance" 
@@ -262,6 +348,56 @@ const Settings = () => {
             </Group>
             <Text size="xs" color="dimmed">
               设置为0或选择永久将永久保存历史记录
+            </Text>
+          </Stack>
+        </Tabs.Panel>
+
+        <Tabs.Panel 
+          value="storage" 
+          style={{ 
+            flex: 1, 
+            overflowY: 'auto', 
+            padding: '16px' 
+          }}
+        >
+          <Stack>
+            <Text size="lg">数据存储设置</Text>
+            <Group>
+              <Text size="sm">本地数据存储位置</Text>
+              <Button 
+                variant="subtle" 
+                size="xs" 
+                onClick={() => window.electronAPI.openStoreDirectory()}
+              >
+                {historyFilePath}
+              </Button>
+            </Group>
+            <TextInput
+              label="Rclone 配置"
+              placeholder="请输入 rclone 配置，例如：remote:history"
+              value={rcloneConfig}
+              onChange={(e) => setRcloneConfig(e.target.value)}
+            />
+            <Group>
+              <Button
+                leftSection={<CloudUpload size={16} />}
+                onClick={handleSyncToCloud}
+                loading={syncing}
+                variant="light"
+              >
+                {syncing ? '同步中...' : '同步到云端'}
+              </Button>
+              <Button
+                leftSection={<Download size={16} />}
+                onClick={handleSyncToLocal}
+                loading={syncingLocal}
+                variant="light"
+              >
+                {syncingLocal ? '同步中...' : '同步到本地'}
+              </Button>
+            </Group>
+            <Text size="xs" color="dimmed">
+              使用 rclone 同步剪贴板历史到云存储或从云存储同步到本地。请确保已安装 rclone 并正确配置了远程存储。
             </Text>
           </Stack>
         </Tabs.Panel>
