@@ -95,7 +95,11 @@ function registerShortcutHandler() {
     if (historyWindow?.isVisible()) {
       historyWindow.hide();
     } else {
-      createHistoryWindow();
+      // 如果窗口不存在则创建
+      if (!historyWindow) {
+        createHistoryWindow();
+      }
+      // 显示窗口
       historyWindow?.show();
     }
   };
@@ -471,11 +475,9 @@ function broadcastClipboardChange(item: ClipboardItem) {
 async function createHistoryWindow() {
   console.log('Creating history window...');
 
-  // 如果已经存在窗口，先销毁它
+  // 如果窗口已存在，直接返回
   if (historyWindow) {
-    console.log('Destroying existing history window...');
-    historyWindow.destroy();
-    historyWindow = null;
+    return;
   }
 
   // 创建新窗口
