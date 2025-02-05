@@ -76,90 +76,110 @@ function History() {
   };
 
   // 根据保存时间过滤历史记录
-  const filterByRetentionPeriod = (items: ClipboardItem[]) => {
-    if (retentionUnit === 'permanent') return items;
+  const filterByRetentionPeriod = (
+    items: ClipboardItem[], 
+    period: number, 
+    unit: Period
+  ) => {
+    if (unit === 'permanent') return items;
     
     const now = dayjs();
-    const cutoffTime = now.subtract(retentionPeriod, retentionUnit).valueOf();
+    const cutoffTime = now.subtract(period, unit).valueOf();
     
     return items.filter(item => 
       item.favorite || item.timestamp >= cutoffTime
     );
   };
 
-  // 加载保存时间设置
-  useEffect(() => {
-    const loadRetentionSettings = async () => {
-      try {
-        const period = await window.electronAPI.getStoreValue('retentionPeriod');
-        const unit = await window.electronAPI.getStoreValue('retentionUnit');
-        if (period !== undefined) setRetentionPeriod(period);
-        if (unit !== undefined) setRetentionUnit(unit as Period);
-      } catch (error) {
-        console.error('Failed to load retention settings:', error);
-      }
-    };
-    loadRetentionSettings();
-  }, []);
-
-  // 获取剪贴板历史
-  useEffect(() => {
-    const fetchHistory = async () => {
-      try {
-        // setLoading(true);
-        const history = await window.electronAPI.getClipboardHistory();
-        console.log('history', history);
-        const filteredByTime = filterByRetentionPeriod(history);
-        setClipboardHistory(filteredByTime);
-      } catch (error) {
-        console.error('Error fetching clipboard history:', error);
-      } finally {
-        // setLoading(false);
-      }
-    };
-    fetchHistory();
-
-    // 监听剪贴板变化
-    const unsubscribe = window.electronAPI.onClipboardChange((newItem) => {
-      setClipboardHistory(prev => {
-        const newHistory = [newItem, ...prev.filter(item => item.content !== newItem.content)];
-        return filterByRetentionPeriod(newHistory);
-      });
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, [retentionPeriod, retentionUnit]);
-
-  // 根据搜索和分类过滤历史记录
-  useEffect(() => {
-    let filtered = clipboardHistory;
+  // 过滤历史记录的函数
+  const filterHistory = (history: ClipboardItem[], query: string, cat: CategoryType) => {
+    let filtered = history;
 
     // 应用搜索过滤
-    if (searchQuery) {
+    if (query) {
       filtered = filtered.filter(item => {
         if (item.type === 'text') {
-          return item.content.toLowerCase().includes(searchQuery.toLowerCase());
+          return item.content.toLowerCase().includes(query.toLowerCase());
         }
         return false;
       });
     }
 
     // 应用分类过滤
-    if (category !== 'all') {
-      if (category === 'favorite') {
+    if (cat !== 'all') {
+      if (cat === 'favorite') {
         filtered = filtered.filter(item => item.favorite);
       } else {
-        filtered = filtered.filter(item => item.type === category);
+        filtered = filtered.filter(item => item.type === cat);
       }
     }
 
+    return filtered;
+  };
+
+  // 更新过滤结果和分页
+  const updateFilteredResults = (filtered: ClipboardItem[]) => {
     setFilteredHistory(filtered);
     setPage(1);
     setDisplayedHistory(filtered.slice(0, ITEMS_PER_PAGE));
     setHasMore(filtered.length > ITEMS_PER_PAGE);
-  }, [clipboardHistory, searchQuery, category]);
+  };
+
+  // 处理搜索变化
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+    updateFilteredResults(filterHistory(clipboardHistory, query, category));
+  };
+
+  // 处理分类变化
+  const handleCategoryChange = (cat: CategoryType) => {
+    setCategory(cat);
+    updateFilteredResults(filterHistory(clipboardHistory, searchQuery, cat));
+  };
+
+  // 加载设置并获取历史记录
+  useEffect(() => {
+    console.log('initialize--useEffect');
+    const initialize = async () => {
+      try {
+        // 首先加载设置
+        const period = await window.electronAPI.getStoreValue('retentionPeriod') || 30;
+        const unit = (await window.electronAPI.getStoreValue('retentionUnit') || 'days') as Period;
+
+        // 然后获取历史记录
+        const history = await window.electronAPI.getClipboardHistory();
+        console.log('history', history);
+        const filteredByTime = filterByRetentionPeriod(history, period, unit);
+        setClipboardHistory(filteredByTime);
+        // 初始化过滤后的历史记录
+        setFilteredHistory(filteredByTime);
+        setDisplayedHistory(filteredByTime.slice(0, ITEMS_PER_PAGE));
+        setHasMore(filteredByTime.length > ITEMS_PER_PAGE);
+
+        // 设置剪贴板变化监听器
+        const unsubscribe = window.electronAPI.onClipboardChange((newItem) => {
+          setClipboardHistory(prev => {
+            const newHistory = [newItem, ...prev.filter(item => item.content !== newItem.content)];
+            const filtered = filterByRetentionPeriod(newHistory, period, unit);
+            // 应用当前的搜索和分类过滤
+            const finalFiltered = filterHistory(filtered, searchQuery, category);
+            setFilteredHistory(finalFiltered);
+            setDisplayedHistory(finalFiltered.slice(0, ITEMS_PER_PAGE));
+            setHasMore(finalFiltered.length > ITEMS_PER_PAGE);
+            return filtered;
+          });
+        });
+
+        return () => {
+          unsubscribe();
+        };
+      } catch (error) {
+        console.error('Error initializing:', error);
+      }
+    };
+    
+    initialize();
+  }, []); 
 
   const handleCopy = async (item: ClipboardItem) => {
     try {
@@ -290,12 +310,12 @@ function History() {
           placeholder="搜索剪贴板历史..."
           leftSection={<Search size={16} />}
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={(e) => handleSearch(e.target.value)}
           style={{ flex: 1 }}
         />
         <SegmentedControl
           value={category}
-          onChange={(value) => setCategory(value as CategoryType)}
+          onChange={(value) => handleCategoryChange(value as CategoryType)}
           data={[
             { label: '全部', value: 'all' },
             { label: '文本', value: 'text' },
@@ -335,10 +355,15 @@ function History() {
                 }
               }}
             >
-              <Group justify="space-between" align="start" style={{ height: '100%' }}>
+              <Group 
+                justify="space-between" 
+                align="start" 
+                style={{ height: '100%' }}
+              >
                 <div
                   style={{ 
-                    flex: 1
+                    flex: 1,
+                    maxWidth: 400
                   }}
                 >
                   {renderContent(item)}
