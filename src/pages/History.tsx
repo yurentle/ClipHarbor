@@ -50,9 +50,6 @@ function History() {
   const [category, setCategory] = useState<CategoryType>('all')
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(true)
-  const [retentionPeriod, setRetentionPeriod] = useState<number>(30)
-  const [retentionUnit, setRetentionUnit] = useState<Period>('days')
-
   // 加载更多
   const loadMore = () => {
     const nextPage = page + 1;
