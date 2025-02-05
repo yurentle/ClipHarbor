@@ -39,7 +39,7 @@ interface ClipboardItem {
 type CategoryType = 'all' | 'text' | 'image' | 'file' | 'favorite'
 type Period = 'days' | 'months' | 'years' | 'permanent'
 
-const ITEMS_PER_PAGE = 20;
+const ITEMS_PER_PAGE = 50;
 
 function History() {
   const viewport = useRef<HTMLDivElement>(null);
