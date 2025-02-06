@@ -1,4 +1,4 @@
-import { app, BrowserWindow, clipboard, ipcMain, nativeImage, globalShortcut, Tray, Menu, shell } from 'electron';
+import { app, BrowserWindow, clipboard, ipcMain, nativeImage, globalShortcut, Tray, Menu, shell, screen } from 'electron';
 import path from 'path';
 import Store from 'electron-store';
 import { v4 as uuidv4 } from 'uuid';
@@ -86,7 +86,22 @@ function registerShortcutHandler() {
       if (!historyWindow) {
         createHistoryWindow();
       }
-      // 显示窗口
+      // 获取鼠标位置
+      const mousePoint = screen.getCursorScreenPoint();
+      // 获取鼠标所在的显示器
+      const display = screen.getDisplayNearestPoint(mousePoint);
+      
+      // 计算窗口位置，使其显示在鼠标位置的正下方
+      const windowBounds = historyWindow!.getBounds();
+      let x = mousePoint.x - windowBounds.width / 2;
+      let y = mousePoint.y + 10; // 在鼠标下方10像素处显示
+
+      // 确保窗口不会超出显示器边界
+      x = Math.max(display.bounds.x, Math.min(x, display.bounds.x + display.bounds.width - windowBounds.width));
+      y = Math.max(display.bounds.y, Math.min(y, display.bounds.y + display.bounds.height - windowBounds.height));
+
+      // 设置窗口位置并显示
+      historyWindow!.setPosition(Math.round(x), Math.round(y));
       historyWindow?.show();
     }
   };
