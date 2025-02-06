@@ -23,8 +23,7 @@ import {
   CloudUpload,
   Download
 } from 'tabler-icons-react';
-
-type Period = 'days' | 'months' | 'years' | 'permanent';
+import { Period } from '../types';
 
 const Settings = () => {
   const theme = useMantineTheme();

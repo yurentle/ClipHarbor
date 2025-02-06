@@ -12,32 +12,16 @@ import {
   Image,
   ScrollArea
 } from '@mantine/core'
-import { Copy, Heart, Search, Trash, Folder } from 'tabler-icons-react'
+import { Copy, Heart, Search, Trash } from 'tabler-icons-react'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import 'dayjs/locale/zh-cn'
 import './history.css'
+import { ClipboardItem, CategoryType, Period } from '../types'
 
 // 配置 dayjs
 dayjs.extend(relativeTime)
 dayjs.locale('zh-cn')
-
-// 定义剪贴板项的类型
-interface ClipboardItem {
-  id: string
-  content: string
-  type: 'text' | 'image' | 'file'
-  timestamp: number
-  favorite: boolean
-  metadata?: {
-    width?: number
-    height?: number
-    size?: number
-  }
-}
-
-type CategoryType = 'all' | 'text' | 'image' | 'file' | 'favorite'
-type Period = 'days' | 'months' | 'years' | 'permanent'
 
 const ITEMS_PER_PAGE = 50;
 
@@ -261,22 +245,6 @@ function History() {
             </Text>
           </Stack>
         )
-      case 'file':
-        return (
-          <Stack gap="xs">
-            <Group>
-              <Folder size={24} />
-              <Text lineClamp={2} size="sm">
-                {item.content.split(',').map(path => 
-                  path.split('/').pop()
-                ).join(', ')}
-              </Text>
-            </Group>
-            <Text size="xs" c="dimmed">
-              {timeAgo} · 文件 · {item.content.split(',').length} 个
-            </Text>
-          </Stack>
-        )
       default:
         return <Text>未知类型</Text>
     }
@@ -317,7 +285,6 @@ function History() {
             { label: '全部', value: 'all' },
             { label: '文本', value: 'text' },
             { label: '图片', value: 'image' },
-            { label: '文件', value: 'file' },
             { label: '收藏', value: 'favorite' },
           ]}
         />

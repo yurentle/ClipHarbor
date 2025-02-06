@@ -5,23 +5,10 @@ import { v4 as uuidv4 } from 'uuid';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
+import { ClipboardItem } from '../src/types';
 
 declare global {
   var clipboardInterval: NodeJS.Timeout | undefined;
-}
-
-// 定义剪贴板项的类型
-interface ClipboardItem {
-  id: string
-  content: string
-  type: 'text' | 'image' | 'file'
-  timestamp: number
-  favorite: boolean
-  metadata?: {
-    width?: number
-    height?: number
-    size?: number
-  }
 }
 
 const store = new Store({
