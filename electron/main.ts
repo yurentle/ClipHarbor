@@ -135,13 +135,18 @@ function registerIpcHandlers() {
 
   // 保存到剪贴板
   ipcMain.handle('save-to-clipboard', (_, item: ClipboardItem) => {
-    if (item.type === 'image') {
-      const image = clipboard.readImage().create(item.content)
-      clipboard.writeImage(image)
-    } else {
-      clipboard.writeText(item.content)
+    try {
+      if (item.type === 'image') {
+        const image = nativeImage.createFromDataURL(item.content);
+        clipboard.writeImage(image);
+      } else {
+        clipboard.writeText(item.content);
+      }
+      return true;
+    } catch (error) {
+      console.error('Error saving to clipboard:', error);
+      return false;
     }
-    return true
   })
 
   // 从历史记录中删除
