@@ -9,7 +9,10 @@ import {
   Button,
   Group,
   useMantineTheme,
-  Select
+  Select,
+  Container,
+  Card,
+  Title
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { 
@@ -39,6 +42,7 @@ const Settings = () => {
   const [syncing, setSyncing] = useState(false);
   const [syncingLocal, setSyncingLocal] = useState(false);
   const [historyFilePath, setHistoryFilePath] = useState('');
+  const [autoHide, setAutoHide] = useState(true);
 
   useEffect(() => {
     const init = async () => {
@@ -57,8 +61,11 @@ const Settings = () => {
       try {
         const period = await window.electronAPI.getStoreValue('retentionPeriod');
         const unit = await window.electronAPI.getStoreValue('retentionUnit');
+        const autoHideSetting = await window.electronAPI.getAutoHide();
+        
         if (period !== undefined) setRetentionPeriod(period);
         if (unit !== undefined) setRetentionUnit(unit);
+        if (autoHideSetting !== undefined) setAutoHide(autoHideSetting);
       } catch (error) {
         console.error('Failed to load retention settings:', error);
       }
@@ -71,6 +78,7 @@ const Settings = () => {
       try {
         const config = await window.electronAPI.getStoreValue('rcloneConfig');
         const filePath = await window.electronAPI.getHistoryFilePath();
+        
         if (config) setRcloneConfig(config);
         if (filePath) setHistoryFilePath(filePath);
       } catch (error) {
@@ -171,6 +179,11 @@ const Settings = () => {
     }
   };
 
+  const handleAutoHideChange = async (checked: boolean) => {
+    setAutoHide(checked);
+    await window.electronAPI.setAutoHide(checked);
+  };
+
   const handleSyncToCloud = async () => {
     if (!rcloneConfig) {
       notifications.show({
@@ -191,7 +204,7 @@ const Settings = () => {
       });
     } catch (error: any) {
       notifications.show({
-        title: '同步失败111',
+        title: '同步失败',
         message: error.message || '同步数据时发生错误',
         color: 'red'
       });
@@ -230,7 +243,7 @@ const Settings = () => {
   };
 
   return (
-    <div style={{ height: '100vh', padding: '20px' }}>
+    <Container p="md">
       <Tabs 
         value={activeTab} 
         onChange={(value) => setActiveTab(value || 'shortcuts')}
@@ -348,6 +361,12 @@ const Settings = () => {
             <Text size="xs" color="dimmed">
               设置为0或选择永久将永久保存历史记录
             </Text>
+            <Switch
+              label="自动隐藏历史窗口"
+              description="当历史窗口失去焦点时自动隐藏"
+              checked={autoHide}
+              onChange={(event) => handleAutoHideChange(event.currentTarget.checked)}
+            />
           </Stack>
         </Tabs.Panel>
 
@@ -462,7 +481,7 @@ const Settings = () => {
           </Stack>
         </Tabs.Panel>
       </Tabs>
-    </div>
+    </Container>
   );
 };
 

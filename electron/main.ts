@@ -1,4 +1,4 @@
-import { app, BrowserWindow, clipboard, ipcMain, nativeImage, globalShortcut, Tray, Menu, shell, screen } from 'electron';
+import { app, BrowserWindow, clipboard, ipcMain, nativeImage, globalShortcut, Tray, Menu, shell, screen, desktopCapturer } from 'electron';
 import path from 'path';
 import Store from 'electron-store';
 import { v4 as uuidv4 } from 'uuid';
@@ -20,7 +20,8 @@ const store = new Store({
       showDockIcon: true,
       showTrayIcon: true,
       retentionPeriod: 30,
-      retentionUnit: 'days'
+      retentionUnit: 'days',
+      autoHideHistory: true // 新增自动隐藏设置
     }
   },
   clearInvalidConfig: false, // 不清除无效配置
@@ -78,32 +79,112 @@ let tray: Tray | null = null;
 
 // 注册快捷键处理函数
 function registerShortcutHandler() {
-  return () => {
+  return async () => {
+    console.log('触发快捷键');
+    
+    // 如果窗口可见则隐藏
     if (historyWindow?.isVisible()) {
+      console.log('历史窗口可见，隐藏它');
       historyWindow.hide();
-    } else {
-      // 如果窗口不存在则创建
-      if (!historyWindow) {
-        createHistoryWindow();
-      }
-      // 获取鼠标位置
-      const mousePoint = screen.getCursorScreenPoint();
-      // 获取鼠标所在的显示器
-      const display = screen.getDisplayNearestPoint(mousePoint);
-      
-      // 计算窗口位置，使其显示在鼠标位置的正下方
-      const windowBounds = historyWindow!.getBounds();
-      let x = mousePoint.x - windowBounds.width / 2;
-      let y = mousePoint.y + 10; // 在鼠标下方10像素处显示
-
-      // 确保窗口不会超出显示器边界
-      x = Math.max(display.bounds.x, Math.min(x, display.bounds.x + display.bounds.width - windowBounds.width));
-      y = Math.max(display.bounds.y, Math.min(y, display.bounds.y + display.bounds.height - windowBounds.height));
-
-      // 设置窗口位置并显示
-      historyWindow!.setPosition(Math.round(x), Math.round(y));
-      historyWindow?.show();
+      return;
     }
+    
+    console.log('显示历史窗口');
+    
+    // 如果窗口不存在则创建
+    if (!historyWindow) {
+      console.log('创建新的历史窗口');
+      await createHistoryWindow();
+    }
+
+    // 获取鼠标位置
+    const mousePoint = screen.getCursorScreenPoint();
+    // 获取鼠标所在的显示器
+    const display = screen.getDisplayNearestPoint(mousePoint);
+    
+    // 计算窗口位置，使其显示在鼠标位置的正下方
+    const windowBounds = historyWindow!.getBounds();
+    let x = mousePoint.x - windowBounds.width / 2;
+    let y = mousePoint.y + 10; // 在鼠标下方10像素处显示
+
+    // 确保窗口不会超出显示器边界
+    x = Math.max(display.bounds.x, Math.min(x, display.bounds.x + display.bounds.width - windowBounds.width));
+    y = Math.max(display.bounds.y, Math.min(y, display.bounds.y + display.bounds.height - windowBounds.height));
+
+    // 禁用自动隐藏
+    historyWindow!.removeAllListeners('blur');
+    
+    // 在 macOS 上特殊处理
+    if (process.platform === 'darwin') {
+      console.log('设置窗口在所有工作区可见');
+      historyWindow!.setVisibleOnAllWorkspaces(true, {
+        visibleOnFullScreen: true
+      });
+    }
+
+    // 设置窗口位置并显示
+    historyWindow!.setBounds({
+      x: Math.round(x),
+      y: Math.round(y),
+      width: windowBounds.width,
+      height: windowBounds.height
+    });
+
+    // 显示窗口前先激活应用
+    app.focus({ steal: true });
+
+    // 等待一帧以确保位置设置生效
+    setTimeout(() => {
+      if (historyWindow) {
+        // 显示窗口并立即设置焦点
+        historyWindow.showInactive();
+        historyWindow.focus();
+
+        // 延迟重新绑定blur事件
+        setTimeout(() => {
+          if (historyWindow) {
+            console.log('重新绑定blur事件');
+            if (process.platform === 'darwin') {
+              historyWindow.setVisibleOnAllWorkspaces(false);
+            }
+
+            // 使用一个标志来跟踪是否正在处理blur事件
+            let isProcessingBlur = false;
+
+            historyWindow.on('blur', () => {
+              // 如果正在处理blur事件，直接返回
+              if (isProcessingBlur) {
+                return;
+              }
+
+              console.log('历史窗口失去焦点');
+              const autoHide = store.get('settings.autoHideHistory', true);
+              if (autoHide && historyWindow && !historyWindow.webContents.isDevToolsOpened()) {
+                isProcessingBlur = true;
+
+                // 给一个短暂的延迟，让窗口有机会重新获得焦点
+                setTimeout(() => {
+                  const focusedWindow = BrowserWindow.getFocusedWindow();
+                  console.log('当前焦点窗口:', focusedWindow?.id);
+                  console.log('主窗口:', mainWindow?.id);
+                  console.log('历史窗口:', historyWindow?.id);
+
+                  // 只有在确实失去焦点时才隐藏窗口
+                  if (!historyWindow?.isFocused() && focusedWindow !== mainWindow) {
+                    console.log('由于失去焦点隐藏历史窗口');
+                    historyWindow?.hide();
+                  } else {
+                    console.log('窗口仍然有焦点，不隐藏');
+                  }
+
+                  isProcessingBlur = false;
+                }, 100);
+              }
+            });
+          }
+        }, 200);
+      }
+    }, 16); // 大约一帧的时间
   };
 }
 
@@ -412,6 +493,17 @@ function registerIpcHandlers() {
     const localPath = app.getPath('userData');
     shell.openPath(localPath);
   });
+
+  // 设置自动隐藏
+  ipcMain.handle('set-auto-hide', (_, value: boolean) => {
+    store.set('settings.autoHideHistory', value);
+    return true;
+  });
+
+  // 获取自动隐藏设置
+  ipcMain.handle('get-auto-hide', () => {
+    return store.get('settings.autoHideHistory', true);
+  });
 }
 
 // 注册快捷键
@@ -480,11 +572,11 @@ function broadcastClipboardChange(item: ClipboardItem) {
 
 // 创建历史记录窗口
 async function createHistoryWindow() {
-  console.log('Creating history window...');
+  console.log('创建历史窗口...');
 
   // 如果窗口已存在，直接返回
   if (historyWindow) {
-    return;
+    return historyWindow;
   }
 
   // 创建新窗口
@@ -505,73 +597,78 @@ async function createHistoryWindow() {
     vibrancy: 'menu',  // 添加毛玻璃效果（仅在 macOS 上生效）
     visualEffectState: 'active',  // 保持毛玻璃效果活跃（仅在 macOS 上生效）
     roundedCorners: true,  // 圆角窗口（仅在 macOS 上生效）
+    focusable: true,  // 确保窗口可以获得焦点
   });
 
-  console.log('Loading URL for history window...');
+  console.log('加载历史窗口URL...');
+
+  // 根据环境加载不同的URL
+  const isDevelopment = process.env.NODE_ENV === 'development' || process.env.DEBUG_PROD === 'true';
+  if (isDevelopment && !process.env.IS_TEST) {
+    await historyWindow.loadURL('http://localhost:5173/#/history');
+  } else {
+    await historyWindow.loadFile('dist/index.html', {
+      hash: 'history'
+    });
+  }
+
+  let isClosing = false;
+
+  // 添加焦点事件监听
+  historyWindow.on('focus', () => {
+    console.log('历史窗口获得焦点');
+  });
+
+  // 监听窗口失去焦点事件
+  historyWindow.on('blur', () => {
+    if (isClosing) {
+      console.log('窗口正在关闭，忽略blur事件');
+      return;
+    }
+    console.log('历史窗口失去焦点');
+    // 获取自动隐藏设置
+    const autoHide = store.get('settings.autoHideHistory', true); // 默认为 true
+    if (autoHide && historyWindow && !historyWindow.webContents.isDevToolsOpened()) {
+      // 检查是否是因为切换到了设置窗口
+      const focusedWindow = BrowserWindow.getFocusedWindow();
+      console.log('当前焦点窗口:', focusedWindow?.id);
+      console.log('主窗口:', mainWindow?.id);
+      if (focusedWindow !== mainWindow) {
+        console.log('由于失去焦点隐藏历史窗口');
+        isClosing = true;
+        setTimeout(() => {
+          historyWindow?.hide();
+          isClosing = false;
+        }, 100);
+      }
+    }
+  });
+
+  // 监听窗口显示事件
+  historyWindow.on('show', () => {
+    console.log('历史窗口显示');
+  });
+
+  // 监听窗口隐藏事件
+  historyWindow.on('hide', () => {
+    console.log('历史窗口隐藏');
+  });
+
+  // 监听窗口关闭事件
+  historyWindow.on('closed', () => {
+    console.log('历史窗口关闭');
+    historyWindow = null;
+  });
 
   // 添加 ESC 键监听
   historyWindow.webContents.on('before-input-event', (event, input) => {
     if (input.key === 'Escape' && !input.alt && !input.control && !input.shift && !input.meta) {
+      console.log('按下ESC键，隐藏历史窗口');
       historyWindow?.hide();
     }
   });
 
-  // 返回一个 Promise，确保窗口完全加载
-  return new Promise<void>(async (resolve, reject) => {
-    try {
-      // 监听页面加载完成事件
-      historyWindow!.webContents.once('did-finish-load', () => {
-        console.log('Page finished loading');
-        if (historyWindow) {
-          historyWindow.show();
-          historyWindow.focus();
-          // 短暂延时后关闭置顶
-          setTimeout(() => {
-            if (historyWindow) {
-              historyWindow.setAlwaysOnTop(false);
-            }
-          }, 300);
-          console.log('History window is now visible and focused');
-          resolve();
-        }
-      });
-
-      // 监听加载失败事件
-      historyWindow!.webContents.once('did-fail-load', (event, errorCode, errorDescription) => {
-        console.error('Failed to load:', errorCode, errorDescription);
-        reject(new Error(`Failed to load: ${errorDescription}`));
-      });
-
-      // 在开发环境中，尝试连接到 Vite 开发服务器
-      const isDev = process.env.NODE_ENV === 'development' || process.env.DEBUG_PROD === 'true';
-      if (isDev) {
-        const devServerUrl = 'http://localhost:5173';
-        console.log('Development mode - Loading URL:', devServerUrl);
-        await historyWindow!.loadURL(devServerUrl);
-      } else {
-        const filePath = path.join(__dirname, '../dist/index.html');
-        console.log('Production mode - Loading file:', filePath);
-        await historyWindow!.loadFile(filePath);
-      }
-
-      // 监听窗口关闭事件
-      historyWindow!.on('closed', () => {
-        console.log('History window closed');
-        historyWindow = null;
-      });
-
-      // 监听窗口失去焦点事件
-      historyWindow!.on('blur', () => {
-        if (historyWindow && !historyWindow.webContents.isDevToolsOpened()) {
-          historyWindow.hide();
-        }
-      });
-
-    } catch (error) {
-      console.error('Error loading history window:', error);
-      reject(error);
-    }
-  });
+  return historyWindow;
 }
 
 // 创建主窗口（设置页面）
@@ -741,6 +838,10 @@ app.whenReady().then(async () => {
   // 创建主窗口
   await createWindow();
   
+  // 创建并隐藏历史窗口
+  await createHistoryWindow();
+  historyWindow?.hide();
+
   // 设置 Tray 图标
   tray = new Tray(path.join(__dirname, '../public/logo_tray.png'));
   const contextMenu = Menu.buildFromTemplate([
