@@ -1,5 +1,5 @@
 {
-  "name": "cli-cp",
+  "name": "ClipHarbor",
   "private": true,
   "version": "0.0.1",
   "main": "dist-electron/main.js",
@@ -10,8 +10,8 @@
     "preview": "vite preview"
   },
   "build": {
-    "appId": "com.cli-cp.app",
-    "productName": "Clipboard Manager",
+    "appId": "io.github.yurentle.ClipHarbor",
+    "productName": "ClipHarbor",
     "directories": {
       "output": "release"
     },
@@ -20,7 +20,33 @@
       "dist-electron/**/*"
     ],
     "mac": {
-      "category": "public.app-category.utilities"
+      "category": "public.app-category.utilities",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "public/logo_dock.png"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "public/logo_dock.png"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "icon": "public/logo_dock.png",
+      "category": "Utility"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
     }
   },
   "dependencies": {
