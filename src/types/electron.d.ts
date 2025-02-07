@@ -1,4 +1,4 @@
-import { ClipboardItem } from './index'
+import { ClipboardItem } from './clipboard'
 
 export interface ElectronAPI {
   onClipboardChange: (callback: (newItem: ClipboardItem) => void) => () => void

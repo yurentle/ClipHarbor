@@ -11,5 +11,9 @@ export interface ClipboardItem {
   }
 }
 
+export interface ClipboardHistory {
+  clipboardHistory: ClipboardItem[]
+}
+
 export type CategoryType = 'all' | 'text' | 'image' | 'favorite'
 export type Period = 'days' | 'months' | 'years' | 'permanent'

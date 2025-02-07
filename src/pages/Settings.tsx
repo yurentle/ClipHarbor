@@ -23,7 +23,7 @@ import {
   CloudUpload,
   Download
 } from 'tabler-icons-react';
-import { Period } from '../types';
+import { Period } from '../types/clipboard';
 
 const Settings = () => {
   const theme = useMantineTheme();
@@ -45,6 +45,14 @@ const Settings = () => {
       try {
         const defaultShortcut = await window.electronAPI.getShortcut();
         setShortcut(defaultShortcut);
+
+        // 获取托盘图标状态
+        const trayIconEnabled = await window.electronAPI.getStoreValue('settings.showTrayIcon');
+        setShowTrayIcon(trayIconEnabled !== undefined ? trayIconEnabled : true);
+
+        // 获取 Dock 图标状态
+        const dockIconEnabled = await window.electronAPI.getStoreValue('settings.showDockIcon');
+        setShowDockIcon(dockIconEnabled !== undefined ? dockIconEnabled : true);
       } catch (error) {
         console.error('Error initializing settings:', error);
       }

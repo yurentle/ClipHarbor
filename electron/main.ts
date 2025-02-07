@@ -1,15 +1,20 @@
-import { app, BrowserWindow, clipboard, ipcMain, nativeImage, globalShortcut, Tray, Menu, shell, screen } from 'electron';
+import { app, BrowserWindow, clipboard, ipcMain, nativeImage, globalShortcut, Tray, Menu, shell, screen, MenuItemConstructorOptions } from 'electron';
 import path from 'path';
 import Store from 'electron-store';
 import { v4 as uuidv4 } from 'uuid';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
-import { ClipboardItem } from '../src/types';
+import { ClipboardItem, ClipboardHistory } from '../src/types/clipboard';
 
 declare global {
   var clipboardInterval: NodeJS.Timeout | undefined;
 }
+
+let mainWindow: BrowserWindow | null = null
+let historyWindow: BrowserWindow | null = null
+let tray: Tray | null = null;
+let contextMenu: Menu | null = null;
 
 const store = new Store({
   name: 'clipboard-history',
@@ -71,10 +76,6 @@ function getImageMetadata(dataUrl: string): { width: number; height: number; siz
     size
   }
 }
-
-let mainWindow: BrowserWindow | null = null
-let historyWindow: BrowserWindow | null = null
-let tray: Tray | null = null;
 
 // 注册快捷键处理函数
 function registerShortcutHandler() {
@@ -142,23 +143,10 @@ function registerIpcHandlers() {
 
   // 处理状态栏图标显示设置
   ipcMain.handle('toggle-tray-icon', (_, show: boolean) => {
-    if (show && !tray) {
-      tray = new Tray(path.join(__dirname, '../public/logo_tray.png'));
-      const contextMenu = Menu.buildFromTemplate([
-        { label: 'Show App', click: () => { mainWindow?.show(); } },
-        { label: 'Quit', click: () => { app.quit(); } }
-      ]);
-      tray.setToolTip('ClipHarbor');
-      tray.setContextMenu(contextMenu);
-    } else if (!show && tray) {
-      tray.destroy();
-      tray = null;
-    }
-    store.set('settings.showTrayIcon', show);
-    return show;
+    return manageTrayIcon(show);
   });
 
-  // 保存到剪贴板
+  // 处理保存到剪贴板
   ipcMain.handle('save-to-clipboard', (_, item: ClipboardItem) => {
     try {
       if (item.type === 'image') {
@@ -202,15 +190,6 @@ function registerIpcHandlers() {
       }
     }
     store.set('settings.showDockIcon', show);
-    return true;
-  });
-
-  // 切换托盘图标显示
-  ipcMain.handle('toggle-tray', async (_, show: boolean) => {
-    if (tray) {
-      tray.setVisible(show);
-    }
-    store.set('settings.showTrayIcon', show);
     return true;
   });
 
@@ -346,8 +325,8 @@ function registerIpcHandlers() {
       // 确保本地数据文件存在
       if (!fs.existsSync(localFile)) {
         // 如果文件不存在，创建一个包含空历史记录的文件
-        const initialData = {
-          clipboardHistory: store.get('clipboardHistory', [])
+        const initialData: ClipboardHistory = {
+          clipboardHistory: store.get('clipboardHistory', []) as ClipboardItem[]
         };
         await fs.promises.mkdir(path.dirname(localFile), { recursive: true });
         await fs.promises.writeFile(localFile, JSON.stringify(initialData, null, 2));
@@ -557,12 +536,24 @@ async function createHistoryWindow() {
       if (isDev) {
         const devServerUrl = 'http://localhost:5173';
         console.log('Development mode - Loading URL:', devServerUrl);
-        await historyWindow!.loadURL(devServerUrl);
+        try {
+          await historyWindow!.loadURL(devServerUrl);
+          console.log('Successfully loaded dev server URL');
+          // 开发环境下打开开发者工具
+          historyWindow.webContents.openDevTools();
+        } catch (error) {
+          console.error('Failed to load dev server URL, falling back to file:', error);
+          // 如果连接开发服务器失败，回退到加载本地文件
+          const filePath = path.join(__dirname, '../dist/index.html');
+          await historyWindow!.loadFile(filePath);
+        }
       } else {
+        // 生产环境直接加载本地文件
         const filePath = path.join(__dirname, '../dist/index.html');
         console.log('Production mode - Loading file:', filePath);
         await historyWindow!.loadFile(filePath);
       }
+      console.log('URL loaded successfully');
 
       // 监听窗口关闭事件
       historyWindow!.on('closed', () => {
@@ -582,6 +573,53 @@ async function createHistoryWindow() {
       reject(error);
     }
   });
+}
+
+// 创建托盘图标
+function createTrayIcon(): Tray {
+  const icon = nativeImage.createFromPath(path.join(__dirname, '../public/logo_tray.png'));
+  const newTray = new Tray(icon);
+  newTray.setToolTip('ClipHarbor');
+  contextMenu = contextMenu || createContextMenu();
+  newTray.setContextMenu(contextMenu);
+  return newTray;
+}
+
+// 管理托盘图标
+function manageTrayIcon(show: boolean): boolean {
+  try {
+    if (show && !tray) {
+      tray = createTrayIcon();
+    } else if (!show && tray) {
+      tray.destroy();
+      tray = null;
+      contextMenu = null;
+    }
+    store.set('settings.showTrayIcon', show);
+    return show;
+  } catch (error) {
+    console.error('Error managing tray icon:', error);
+    return false;
+  }
+}
+
+// 创建托盘菜单
+function createContextMenu(): Menu {
+  const template: MenuItemConstructorOptions[] = [
+    {
+      label: '打开设置',
+      click: () => {
+        createWindow();
+      }
+    },
+    {
+      label: '退出',
+      click: () => {
+        app.quit();
+      }
+    }
+  ];
+  return Menu.buildFromTemplate(template);
 }
 
 // 创建主窗口（设置页面）
@@ -679,7 +717,7 @@ function startClipboardMonitoring() {
             const newItem: ClipboardItem = {
               id: uuidv4(),
               content: files.join(','),
-              type: 'file',
+              type: 'text',
               timestamp: Date.now(),
               favorite: false
             }
@@ -751,15 +789,12 @@ app.whenReady().then(async () => {
   // 创建主窗口
   await createWindow();
   
-  // 设置 Tray 图标
-  tray = new Tray(path.join(__dirname, '../public/logo_tray.png'));
-  const contextMenu = Menu.buildFromTemplate([
-    { label: 'Show App', click: () => { mainWindow?.show(); } },
-    { label: 'Quit', click: () => { app.quit(); } }
-  ]);
-  tray.setToolTip('ClipHarbor');
-  tray.setContextMenu(contextMenu);
-  
+  // 创建托盘图标（如果设置中启用）
+  const showTrayIcon = store.get('settings.showTrayIcon', true);
+  if (showTrayIcon) {
+    manageTrayIcon(true);
+  }
+
   // 开始监听剪贴板
   startClipboardMonitoring();
   
