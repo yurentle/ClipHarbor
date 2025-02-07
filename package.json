@@ -2,6 +2,11 @@
   "name": "ClipHarbor",
   "private": true,
   "version": "0.0.1",
+  "description": "A modern clipboard manager for macOS, Windows and Linux",
+  "author": {
+    "name": "yurentle",
+    "email": "yurentle@gmail.com"
+  },
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
@@ -40,7 +45,9 @@
         "deb"
       ],
       "icon": "public/logo_dock.png",
-      "category": "Utility"
+      "category": "Utility",
+      "maintainer": "yurentle <yurentle@gmail.com>",
+      "description": "A modern clipboard manager for macOS, Windows and Linux"
     },
     "nsis": {
       "oneClick": false,
