@@ -86,23 +86,33 @@ function registerShortcutHandler() {
       if (!historyWindow) {
         createHistoryWindow();
       }
-      // 获取鼠标位置
-      const mousePoint = screen.getCursorScreenPoint();
-      // 获取鼠标所在的显示器
-      const display = screen.getDisplayNearestPoint(mousePoint);
-      
-      // 计算窗口位置，使其显示在鼠标位置的正下方
-      const windowBounds = historyWindow!.getBounds();
-      let x = mousePoint.x - windowBounds.width / 2;
-      let y = mousePoint.y + 10; // 在鼠标下方10像素处显示
+      // 获取鼠标位置和显示器信息
+      try {
+        const mousePoint = screen.getCursorScreenPoint();
+        // 获取鼠标所在的显示器
+        const display = screen.getDisplayNearestPoint(mousePoint);
+        
+        // 计算窗口位置，使其显示在鼠标位置的正下方
+        const windowBounds = historyWindow!.getBounds();
+        let x = mousePoint.x - windowBounds.width / 2;
+        let y = mousePoint.y + 10; // 在鼠标下方10像素处显示
 
-      // 确保窗口不会超出显示器边界
-      x = Math.max(display.bounds.x, Math.min(x, display.bounds.x + display.bounds.width - windowBounds.width));
-      y = Math.max(display.bounds.y, Math.min(y, display.bounds.y + display.bounds.height - windowBounds.height));
+        // 确保窗口不会超出显示器边界
+        x = Math.max(display.bounds.x, Math.min(x, display.bounds.x + display.bounds.width - windowBounds.width));
+        y = Math.max(display.bounds.y, Math.min(y, display.bounds.y + display.bounds.height - windowBounds.height));
 
-      // 设置窗口位置并显示
-      historyWindow!.setPosition(Math.round(x), Math.round(y));
-      historyWindow?.show();
+        // 设置窗口位置并显示
+        historyWindow!.setBounds({
+          x: Math.round(x),
+          y: Math.round(y),
+          width: windowBounds.width,
+          height: windowBounds.height
+        });
+      } catch (error) {
+        console.error('获取屏幕信息失败:', error);
+        // 发生错误时，将窗口居中显示
+        historyWindow!.center();
+      }
     }
   };
 }
