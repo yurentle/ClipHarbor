@@ -58,6 +58,10 @@
     }
   },
   "dependencies": {
+    "@emotion/react": "^11.13.5",
+    "@mantine/core": "^7.14.3",
+    "@mantine/hooks": "^7.14.3",
+    "@mantine/notifications": "^7.14.3",
     "@types/uuid": "^10.0.0",
     "dayjs": "^1.11.13",
     "electron-store": "^8.1.0",
@@ -65,13 +69,10 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^7.0.1",
+    "tabler-icons-react": "^1.56.0",
     "uuid": "^11.0.3"
   },
   "devDependencies": {
-    "@emotion/react": "^11.13.5",
-    "@mantine/core": "^7.14.3",
-    "@mantine/hooks": "^7.14.3",
-    "@mantine/notifications": "^7.14.3",
     "@types/node": "^22.10.1",
     "@types/react": "^18.2.64",
     "@types/react-dom": "^18.2.21",
@@ -83,7 +84,6 @@
     "eslint": "^8.57.0",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.5",
-    "tabler-icons-react": "^1.56.0",
     "typescript": "^5.2.2",
     "vite": "^5.1.6",
     "vite-plugin-electron": "^0.29.0"
