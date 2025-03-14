@@ -13,13 +13,9 @@ interface ElectronAPI {
   saveToClipboard: (item: any) => Promise<boolean>
   removeFromHistory: (id: string) => Promise<boolean>
   toggleFavorite: (id: string) => Promise<boolean>
-  toggleDock: (show: boolean) => Promise<boolean>
-  toggleTray: (show: boolean) => Promise<boolean>
   getShortcut: () => Promise<string>
   setShortcut: (shortcut: string) => Promise<boolean>
   closeHistoryWindow: () => Promise<void>
-  toggleDockIcon: (show: boolean) => Promise<boolean>
-  toggleTrayIcon: (show: boolean) => Promise<boolean>
   getStoreValue: (key: string) => Promise<any>
   setStoreValue: (key: string, value: any) => Promise<boolean>
   syncData: (config: string) => Promise<boolean>
@@ -47,13 +43,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveToClipboard: (item: any) => ipcRenderer.invoke('save-to-clipboard', item),
   removeFromHistory: (id: string) => ipcRenderer.invoke('remove-from-history', id),
   toggleFavorite: (id: string) => ipcRenderer.invoke('toggle-favorite', id),
-  toggleDock: (show: boolean) => ipcRenderer.invoke('toggle-dock', show),
-  toggleTray: (show: boolean) => ipcRenderer.invoke('toggle-tray', show),
   getShortcut: () => ipcRenderer.invoke('get-shortcut'),
   setShortcut: (shortcut: string) => ipcRenderer.invoke('set-shortcut', shortcut),
   closeHistoryWindow: () => ipcRenderer.invoke('close-history-window'),
-  toggleDockIcon: (show: boolean) => ipcRenderer.invoke('toggle-dock-icon', show),
-  toggleTrayIcon: (show: boolean) => ipcRenderer.invoke('toggle-tray-icon', show),
   getStoreValue: (key: string) => ipcRenderer.invoke('get-store-value', key),
   setStoreValue: (key: string, value: any) => ipcRenderer.invoke('set-store-value', key, value),
   syncData: (config: string) => ipcRenderer.invoke('sync-data', config),

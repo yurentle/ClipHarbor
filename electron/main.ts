@@ -29,8 +29,6 @@ interface StoreSchema {
   clipboardHistory: ClipboardItem[];
   settings: {
     shortcut: string;
-    showDockIcon: boolean;
-    showTrayIcon: boolean;
     retentionPeriod: number;
     retentionUnit: string;
     rcloneConfig?: string;
@@ -92,8 +90,6 @@ class BackupStore implements IStore {
       clipboardHistory: [] as ClipboardItem[],
       settings: {
         shortcut: process.platform === 'darwin' ? 'CommandOrControl+Shift+V' : 'Ctrl+Shift+V',
-        showDockIcon: true,
-        showTrayIcon: true,
         retentionPeriod: 30,
         retentionUnit: 'days'
       }
@@ -120,8 +116,6 @@ try {
     clipboardHistory: [] as ClipboardItem[],
     settings: {
       shortcut: process.platform === 'darwin' ? 'CommandOrControl+Shift+V' : 'Ctrl+Shift+V',
-      showDockIcon: true,
-      showTrayIcon: true,
       retentionPeriod: 30,
       retentionUnit: 'days'
     }
@@ -133,8 +127,6 @@ try {
   
   const defaultSettings: StoreSchema['settings'] = {
     shortcut: process.platform === 'darwin' ? 'CommandOrControl+Shift+V' : 'Ctrl+Shift+V',
-    showDockIcon: true,
-    showTrayIcon: true,
     retentionPeriod: 30,
     retentionUnit: 'days'
   };
@@ -275,31 +267,6 @@ function registerIpcHandlers() {
     return store.get('clipboardHistory', [])
   })
 
-  // 处理 Dock 显示设置
-  ipcMain.handle('toggle-dock-icon', (_, show: boolean) => {
-    if (process.platform === 'darwin') {
-      if (show) {
-        app.dock.show().then(() => {
-          // 显示后重新设置图标
-          app.dock.setIcon(path.join(__dirname, '../public/logo_dock.png'));
-        });
-      } else {
-        app.dock.hide();
-      }
-    }
-    const settings = store.get('settings');
-    store.set('settings', {
-      ...settings,
-      showDockIcon: show
-    });
-    return show;
-  });
-
-  // 处理状态栏图标显示设置
-  ipcMain.handle('toggle-tray-icon', (_, show: boolean) => {
-    return manageTrayIcon(show);
-  });
-
   // 处理保存到剪贴板
   ipcMain.handle('save-to-clipboard', (_, item: ClipboardItem) => {
     try {
@@ -333,23 +300,6 @@ function registerIpcHandlers() {
     store.set('clipboardHistory', newHistory)
     return true
   })
-
-  // 切换 Dock 显示
-  ipcMain.handle('toggle-dock', async (_, show: boolean) => {
-    if (process.platform === 'darwin') {
-      if (show) {
-        app.dock.show();
-      } else {
-        app.dock.hide();
-      }
-    }
-    const settings = store.get('settings');
-    store.set('settings', {
-      ...settings,
-      showDockIcon: show
-    });
-    return true;
-  });
 
   const defaultShortcut = process.platform === 'darwin' ? 'Command+Shift+V' : 'Ctrl+Shift+V';
   
@@ -750,28 +700,6 @@ function createTrayIcon(): Tray {
   return newTray;
 }
 
-// 管理托盘图标
-function manageTrayIcon(show: boolean): boolean {
-  try {
-    if (show && !tray) {
-      tray = createTrayIcon();
-    } else if (!show && tray) {
-      tray.destroy();
-      tray = null;
-      contextMenu = null;
-    }
-    const settings = store.get('settings');
-    store.set('settings', {
-      ...settings,
-      showTrayIcon: show
-    });
-    return show;
-  } catch (error) {
-    console.error('Error managing tray icon:', error);
-    return false;
-  }
-}
-
 // 创建托盘菜单
 function createContextMenu(): Menu {
   const template: MenuItemConstructorOptions[] = [
@@ -952,6 +880,11 @@ function startClipboardMonitoring() {
 app.whenReady().then(async () => {
   console.log('App is ready, initializing...');
   
+  // 在 macOS 上默认隐藏 Dock 图标
+  if (process.platform === 'darwin') {
+    app.dock.hide();
+  }
+  
   // 检查快捷键是否被其他应用占用
   const shortcut = store.get('settings.shortcut') as string;
   if (globalShortcut.isRegistered(shortcut)) {
@@ -968,19 +901,12 @@ app.whenReady().then(async () => {
   
   // 创建主窗口
   await createWindow();
-  
-  // 创建托盘图标（如果设置中启用）
-  const showTrayIcon = store.get('settings.showTrayIcon', true);
-  if (showTrayIcon) {
-    manageTrayIcon(true);
-  }
+
+  // 创建托盘图标
+  createTrayIcon();
 
   // 开始监听剪贴板
   startClipboardMonitoring();
-  
-  if (process.platform === 'darwin') {
-    app.dock.setIcon(path.join(__dirname, '../public/logo_dock.png'));
-  }
 
   app.on('activate', async () => {
     if (!mainWindow) {

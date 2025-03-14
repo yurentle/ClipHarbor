@@ -28,8 +28,6 @@ import { Period } from '../types/clipboard';
 const Settings = () => {
   const theme = useMantineTheme();
   const [activeTab, setActiveTab] = useState<string>('shortcuts');
-  const [showDockIcon, setShowDockIcon] = useState(true);
-  const [showTrayIcon, setShowTrayIcon] = useState(true);
   const [shortcut, setShortcut] = useState('');
   const [shortcutError, setShortcutError] = useState('');
   const [isInputFocused, setIsInputFocused] = useState(false);
@@ -45,14 +43,6 @@ const Settings = () => {
       try {
         const defaultShortcut = await window.electronAPI.getShortcut();
         setShortcut(defaultShortcut);
-
-        // 获取托盘图标状态
-        const trayIconEnabled = await window.electronAPI.getStoreValue('settings.showTrayIcon');
-        setShowTrayIcon(trayIconEnabled !== undefined ? trayIconEnabled : true);
-
-        // 获取 Dock 图标状态
-        const dockIconEnabled = await window.electronAPI.getStoreValue('settings.showDockIcon');
-        setShowDockIcon(dockIconEnabled !== undefined ? dockIconEnabled : true);
       } catch (error) {
         console.error('Error initializing settings:', error);
       }
@@ -148,24 +138,6 @@ const Settings = () => {
 
   const handleKeyUp = (e: React.KeyboardEvent) => {
     // 记录松开的键
-  };
-
-  const handleDockIconToggle = async (checked: boolean) => {
-    try {
-      const result = await window.electronAPI.toggleDockIcon(checked);
-      setShowDockIcon(result);
-    } catch (error) {
-      console.error('Error toggling dock icon:', error);
-    }
-  };
-
-  const handleTrayIconToggle = async (checked: boolean) => {
-    try {
-      const result = await window.electronAPI.toggleTrayIcon(checked);
-      setShowTrayIcon(result);
-    } catch (error) {
-      console.error('Error toggling tray icon:', error);
-    }
   };
 
   const handleRetentionChange = async (value: number, unit: Period) => {
@@ -276,13 +248,6 @@ const Settings = () => {
             styles={{ tab: getTabStyle('storage') }}
           >
             数据存储
-          </Tabs.Tab>
-          <Tabs.Tab 
-            value="appearance" 
-            leftSection={<SettingsIcon size={20} />}
-            styles={{ tab: getTabStyle('appearance') }}
-          >
-            显示设置
           </Tabs.Tab>
           <Tabs.Tab 
             value="about" 
@@ -406,29 +371,6 @@ const Settings = () => {
             <Text size="xs" color="dimmed">
               使用 rclone 同步剪贴板历史到云存储或从云存储同步到本地。请确保已安装 rclone 并正确配置了远程存储。
             </Text>
-          </Stack>
-        </Tabs.Panel>
-
-        <Tabs.Panel 
-          value="appearance" 
-          style={{ 
-            flex: 1, 
-            overflowY: 'auto', 
-            padding: '16px' 
-          }}
-        >
-          <Stack>
-            <Text size="lg">显示设置</Text>
-            <Switch
-              label="在 Dock 栏显示图标"
-              checked={showDockIcon}
-              onChange={(event) => handleDockIconToggle(event.currentTarget.checked)}
-            />
-            <Switch
-              label="在状态栏显示图标"
-              checked={showTrayIcon}
-              onChange={(event) => handleTrayIconToggle(event.currentTarget.checked)}
-            />
           </Stack>
         </Tabs.Panel>
 
