@@ -26,6 +26,7 @@ interface ElectronAPI {
   syncDataFromCloud: (config: string) => Promise<boolean>
   openStoreDirectory: () => Promise<void>
   getHistoryFilePath: () => Promise<string>
+  openSettingsWindow: () => Promise<boolean>
 }
 
 // 使用 contextBridge 暴露 API
@@ -58,7 +59,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   syncData: (config: string) => ipcRenderer.invoke('sync-data', config),
   syncDataFromCloud: (config: string) => ipcRenderer.invoke('sync-data-from-cloud', config),
   openStoreDirectory: () => ipcRenderer.invoke('open-store-directory'),
-  getHistoryFilePath: () => ipcRenderer.invoke('get-history-file-path')
+  getHistoryFilePath: () => ipcRenderer.invoke('get-history-file-path'),
+  openSettingsWindow: () => ipcRenderer.invoke('open-settings-window')
 } as ElectronAPI)
 
 contextBridge.exposeInMainWorld('electronStore', {

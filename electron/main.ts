@@ -1,6 +1,5 @@
 import { app, BrowserWindow, clipboard, ipcMain, nativeImage, globalShortcut, Tray, Menu, shell, screen, MenuItemConstructorOptions } from 'electron';
 import path from 'path';
-import Store from 'electron-store';
 import { v4 as uuidv4 } from 'uuid';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
@@ -561,6 +560,12 @@ function registerIpcHandlers() {
   ipcMain.handle('open-store-directory', () => {
     const localPath = app.getPath('userData');
     shell.openPath(localPath);
+  });
+
+  // 添加打开设置窗口的处理程序
+  ipcMain.handle('open-settings-window', async () => {
+    await createWindow(); // 使用已有的 createWindow 函数
+    return true;
   });
 
   // 注册 Store 相关的处理程序

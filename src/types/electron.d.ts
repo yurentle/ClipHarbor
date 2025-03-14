@@ -19,4 +19,5 @@ export interface ElectronAPI {
   syncDataFromCloud: (config: string) => Promise<boolean>
   openStoreDirectory: () => Promise<void>
   getHistoryFilePath: () => Promise<string>
+  openSettingsWindow: () => Promise<boolean>
 }

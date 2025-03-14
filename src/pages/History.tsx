@@ -12,7 +12,7 @@ import {
   Image,
   ScrollArea
 } from '@mantine/core'
-import { Copy, Heart, Search, Trash } from 'tabler-icons-react'
+import { Copy, Heart, Search, Trash, Settings } from 'tabler-icons-react'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import 'dayjs/locale/zh-cn'
@@ -288,6 +288,13 @@ function History() {
             { label: '收藏', value: 'favorite' },
           ]}
         />
+        <ActionIcon
+          variant="light"
+          color="gray"
+          onClick={() => window.electronAPI.openSettingsWindow()}
+        >
+          <Settings size={16} />
+        </ActionIcon>
       </Group>
       <ScrollArea 
         type="always" 
