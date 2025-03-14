@@ -6,6 +6,7 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
 import { ClipboardItem, ClipboardHistory } from '../src/types/clipboard';
+import { EventEmitter } from 'events';
 
 declare global {
   var clipboardInterval: NodeJS.Timeout | undefined;
@@ -16,21 +17,136 @@ let historyWindow: BrowserWindow | null = null
 let tray: Tray | null = null;
 let contextMenu: Menu | null = null;
 
-const store = new Store({
-  name: 'clipboard-history',
-  defaults: {
-    clipboardHistory: [],
+// 在文件开头添加错误处理
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  if (error.message.includes('Cannot find module')) {
+    console.error('Module not found error. Please check your dependencies.');
+  }
+});
+
+// 在文件开头添加类型定义
+interface StoreSchema {
+  clipboardHistory: ClipboardItem[];
+  settings: {
+    shortcut: string;
+    showDockIcon: boolean;
+    showTrayIcon: boolean;
+    retentionPeriod: number;
+    retentionUnit: string;
+    rcloneConfig?: string;
+  };
+}
+
+type StoreKey = string;
+
+// 修改存储接口
+interface IStore {
+  get(key: StoreKey, defaultValue?: any): any;
+  set(key: StoreKey, value: any): void;
+  delete(key: StoreKey): void;
+  clear(): void;
+  path: string;
+  onDidChange(key: StoreKey, callback: (newValue: any, oldValue: any) => void): () => void;
+}
+
+// 修改 BackupStore 类的实现
+class BackupStore implements IStore {
+  private data: StoreSchema;
+  private emitter: EventEmitter;
+  readonly path: string;
+
+  constructor(defaultData: StoreSchema, storePath: string) {
+    this.data = defaultData;
+    this.path = storePath;
+    this.emitter = new EventEmitter();
+  }
+
+  private getNestedValue(obj: any, path: string) {
+    return path.split('.').reduce((acc, part) => acc?.[part], obj);
+  }
+
+  private setNestedValue(obj: any, path: string, value: any) {
+    const parts = path.split('.');
+    const last = parts.pop()!;
+    const target = parts.reduce((acc, part) => acc[part] = acc[part] || {}, obj);
+    target[last] = value;
+  }
+
+  get(key: StoreKey, defaultValue?: any): any {
+    const value = this.getNestedValue(this.data, key);
+    return value === undefined ? defaultValue : value;
+  }
+
+  set(key: StoreKey, value: any): void {
+    this.setNestedValue(this.data, key, value);
+    this.emitter.emit('change', key, value);
+  }
+
+  delete(key: StoreKey): void {
+    this.setNestedValue(this.data, key, undefined);
+    this.emitter.emit('change', key, undefined);
+  }
+
+  clear(): void {
+    this.data = {
+      clipboardHistory: [] as ClipboardItem[],
+      settings: {
+        shortcut: process.platform === 'darwin' ? 'CommandOrControl+Shift+V' : 'Ctrl+Shift+V',
+        showDockIcon: true,
+        showTrayIcon: true,
+        retentionPeriod: 30,
+        retentionUnit: 'days'
+      }
+    };
+    this.emitter.emit('clear');
+  }
+
+  onDidChange(key: StoreKey, callback: (newValue: any, oldValue: any) => void): () => void {
+    const handler = (changedKey: StoreKey, newValue: any) => {
+      if (changedKey === key) {
+        callback(newValue, this.get(key));
+      }
+    };
+    this.emitter.on('change', handler);
+    return () => this.emitter.off('change', handler);
+  }
+}
+
+// 修改 store 的初始化
+let store: IStore;
+
+try {
+  const data: StoreSchema = {
+    clipboardHistory: [] as ClipboardItem[],
     settings: {
-      shortcut: process.platform === 'darwin' ? 'Command+Shift+V' : 'Ctrl+Shift+V',
+      shortcut: process.platform === 'darwin' ? 'CommandOrControl+Shift+V' : 'Ctrl+Shift+V',
       showDockIcon: true,
       showTrayIcon: true,
       retentionPeriod: 30,
       retentionUnit: 'days'
     }
-  },
-  clearInvalidConfig: false, // 不清除无效配置
-  watch: true // 监听配置变化
-});
+  };
+
+  store = new BackupStore(data, app.getPath('userData'));
+} catch (error) {
+  console.error('Failed to initialize store:', error);
+  
+  const defaultSettings: StoreSchema['settings'] = {
+    shortcut: process.platform === 'darwin' ? 'CommandOrControl+Shift+V' : 'Ctrl+Shift+V',
+    showDockIcon: true,
+    showTrayIcon: true,
+    retentionPeriod: 30,
+    retentionUnit: 'days'
+  };
+
+  const backupStore: StoreSchema = {
+    clipboardHistory: [] as ClipboardItem[],
+    settings: defaultSettings
+  };
+
+  store = new BackupStore(backupStore, app.getPath('userData'));
+}
 
 // 打印存储路径
 log('Store path:', store.path);
@@ -80,42 +196,77 @@ function getImageMetadata(dataUrl: string): { width: number; height: number; siz
 // 注册快捷键处理函数
 function registerShortcutHandler() {
   return () => {
-    if (historyWindow?.isVisible()) {
+    log('Shortcut triggered!');
+    // 如果窗口不存在则创建
+    if (!historyWindow) {
+      log('Creating history window');
+      createHistoryWindow();
+      return;
+    }
+
+    if (historyWindow.isVisible()) {
+      log('History window is visible, hiding it');
       historyWindow.hide();
     } else {
-      // 如果窗口不存在则创建
-      if (!historyWindow) {
-        createHistoryWindow();
-      }
-      // 获取鼠标位置和显示器信息
+      log('History window is not 111 visible, showing it');
+      // 重新设置窗口位置
       try {
         const mousePoint = screen.getCursorScreenPoint();
-        // 获取鼠标所在的显示器
         const display = screen.getDisplayNearestPoint(mousePoint);
-        
-        // 计算窗口位置，使其显示在鼠标位置的正下方
-        const windowBounds = historyWindow!.getBounds();
+        const windowBounds = historyWindow.getBounds();
         let x = mousePoint.x - windowBounds.width / 2;
-        let y = mousePoint.y + 10; // 在鼠标下方10像素处显示
+        let y = mousePoint.y + 10;
 
         // 确保窗口不会超出显示器边界
         x = Math.max(display.bounds.x, Math.min(x, display.bounds.x + display.bounds.width - windowBounds.width));
         y = Math.max(display.bounds.y, Math.min(y, display.bounds.y + display.bounds.height - windowBounds.height));
 
-        // 设置窗口位置并显示
-        historyWindow!.setBounds({
+        historyWindow.setBounds({
           x: Math.round(x),
           y: Math.round(y),
           width: windowBounds.width,
           height: windowBounds.height
         });
       } catch (error) {
-        console.error('获取屏幕信息失败:', error);
-        // 发生错误时，将窗口居中显示
-        historyWindow!.center();
+        log('Error setting window position:', error);
+        historyWindow.center();
       }
+
+      historyWindow.show();
+      historyWindow.focus();
     }
   };
+}
+
+// 创建一个函数来处理所有与 Store 相关的 IPC 通信
+function registerStoreHandlers() {
+  // 获取存储值
+  ipcMain.handle('store-get', (_, key: string) => {
+    return store.get(key);
+  });
+
+  // 设置存储值
+  ipcMain.handle('store-set', (_, key: string, value: any) => {
+    store.set(key, value);
+    return true;
+  });
+
+  // 删除存储值
+  ipcMain.handle('store-delete', (_, key: 'clipboardHistory' | 'settings') => {
+    store.delete(key);
+    return true;
+  });
+
+  // 清空存储
+  ipcMain.handle('store-clear', () => {
+    store.clear();
+    return true;
+  });
+
+  // 获取存储路径
+  ipcMain.handle('store-path', () => {
+    return store.path;
+  });
 }
 
 // 注册所有的 IPC 处理程序
@@ -137,7 +288,11 @@ function registerIpcHandlers() {
         app.dock.hide();
       }
     }
-    store.set('settings.showDockIcon', show);
+    const settings = store.get('settings');
+    store.set('settings', {
+      ...settings,
+      showDockIcon: show
+    });
     return show;
   });
 
@@ -189,7 +344,11 @@ function registerIpcHandlers() {
         app.dock.hide();
       }
     }
-    store.set('settings.showDockIcon', show);
+    const settings = store.get('settings');
+    store.set('settings', {
+      ...settings,
+      showDockIcon: show
+    });
     return true;
   });
 
@@ -198,7 +357,7 @@ function registerIpcHandlers() {
   // 获取设置的快捷键
   ipcMain.handle('get-shortcut', () => {
     log('Getting current shortcut');
-    const settings = store.get('settings');
+    const settings = store.get('settings') as StoreSchema['settings'];
     const shortcut = settings?.shortcut || defaultShortcut;
     log('Current shortcut:', shortcut);
     return shortcut;
@@ -233,8 +392,9 @@ function registerIpcHandlers() {
         const registered = globalShortcut.register(defaultShortcut, registerShortcutHandler());
         log('Default shortcut registration:', registered);
         
+        const settings = store.get('settings') as StoreSchema['settings'];
         store.set('settings', {
-          ...store.get('settings'),
+          ...settings,
           shortcut: defaultShortcut
         });
         return false;
@@ -242,7 +402,7 @@ function registerIpcHandlers() {
 
       // 保存新的快捷键
       log('Saving new shortcut');
-      const currentSettings = store.get('settings') || {};
+      const currentSettings = store.get('settings') as StoreSchema['settings'];
       const newSettings = {
         ...currentSettings,
         shortcut: shortcut
@@ -256,8 +416,9 @@ function registerIpcHandlers() {
       // 如果出错，重新注册默认快捷键
       log('Registering default shortcut:', defaultShortcut);
       globalShortcut.register(defaultShortcut, registerShortcutHandler());
+      const settings = store.get('settings') as StoreSchema['settings'];
       store.set('settings', {
-        ...store.get('settings'),
+        ...settings,
         shortcut: defaultShortcut
       });
       return false;
@@ -401,53 +562,32 @@ function registerIpcHandlers() {
     const localPath = app.getPath('userData');
     shell.openPath(localPath);
   });
+
+  // 注册 Store 相关的处理程序
+  registerStoreHandlers();
 }
 
 // 注册快捷键
 function registerShortcuts() {
-  const defaultShortcut = process.platform === 'darwin' ? 'Command+Shift+V' : 'Ctrl+Shift+V';
-  
-  // Debug: 打印 store 中的所有数据
-  // log('All store data:', JSON.stringify(store.store, null, 2));
-  
-  const settings = store.get('settings');
-  log('Current settings:', JSON.stringify(settings, null, 2));
-  
+  const defaultShortcut = process.platform === 'darwin' ? 'CommandOrControl+Shift+V' : 'Ctrl+Shift+V';
+  const settings = store.get('settings') as StoreSchema['settings'];
   const currentShortcut = settings?.shortcut || defaultShortcut;
   log('Using shortcut:', currentShortcut);
   
-  // 注销所有已注册的快捷键
-  log('Unregistering all shortcuts');
-  globalShortcut.unregisterAll();
+  // 先注销当前快捷键
+  if (globalShortcut.isRegistered(currentShortcut)) {
+    log('Unregistering current shortcut');
+    globalShortcut.unregister(currentShortcut);
+  }
   
   try {
-    // 注册保存的快捷键
+    // 注册快捷键
     log('Registering shortcut:', currentShortcut);
     const success = globalShortcut.register(currentShortcut, registerShortcutHandler());
     log('Shortcut registration success:', success);
     
-    // 检查快捷键是否已注册
-    log('Checking if shortcut is registered');
-    const isRegistered = globalShortcut.isRegistered(currentShortcut);
-    log('Is shortcut registered?', currentShortcut, ':', isRegistered);
-    
-    // 如果注册失败，使用默认快捷键
     if (!success) {
-      log('Failed to register saved shortcut, trying default:', defaultShortcut);
-      log('Registering default shortcut:', defaultShortcut);
-      const registered = globalShortcut.register(defaultShortcut, registerShortcutHandler());
-      log('Default shortcut registration:', registered);
-      
-      if (registered) {
-        const currentSettings = store.get('settings') || {};
-        store.set('settings', {
-          ...currentSettings,
-          shortcut: defaultShortcut
-        });
-        log('Default shortcut registered and saved');
-      } else {
-        log('Failed to register default shortcut');
-      }
+      log('Failed to register shortcut');
     }
   } catch (error) {
     log('Error during shortcut registration:', error);
@@ -483,7 +623,7 @@ async function createHistoryWindow() {
     icon: path.join(__dirname, '../public/logo_dock.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
-      nodeIntegration: false,
+      nodeIntegration: true,
       contextIsolation: true,
       sandbox: false,
     },
@@ -501,8 +641,24 @@ async function createHistoryWindow() {
   // 添加 ESC 键监听
   historyWindow.webContents.on('before-input-event', (event, input) => {
     if (input.key === 'Escape' && !input.alt && !input.control && !input.shift && !input.meta) {
+      log('ESC key pressed, hiding history window');
       historyWindow?.hide();
+      // 重新注册快捷键
+      setTimeout(() => {
+        log('Re-registering shortcuts after ESC');
+        registerShortcuts();
+      }, 100);
     }
+  });
+
+  // 监听窗口隐藏事件
+  historyWindow.on('hide', () => {
+    log('History window hidden');
+    // 重新注册快捷键
+    setTimeout(() => {
+      log('Re-registering shortcuts after hide');
+      registerShortcuts();
+    }, 100);
   });
 
   // 返回一个 Promise，确保窗口完全加载
@@ -539,8 +695,6 @@ async function createHistoryWindow() {
         try {
           await historyWindow!.loadURL(devServerUrl);
           console.log('Successfully loaded dev server URL');
-          // 开发环境下打开开发者工具
-          historyWindow.webContents.openDevTools();
         } catch (error) {
           console.error('Failed to load dev server URL, falling back to file:', error);
           // 如果连接开发服务器失败，回退到加载本地文件
@@ -563,8 +717,14 @@ async function createHistoryWindow() {
 
       // 监听窗口失去焦点事件
       historyWindow!.on('blur', () => {
+        log('History window lost focus');
         if (historyWindow && !historyWindow.webContents.isDevToolsOpened()) {
           historyWindow.hide();
+          // 重新注册快捷键
+          setTimeout(() => {
+            log('Re-registering shortcuts after blur');
+            registerShortcuts();
+          }, 100);
         }
       });
 
@@ -595,7 +755,11 @@ function manageTrayIcon(show: boolean): boolean {
       tray = null;
       contextMenu = null;
     }
-    store.set('settings.showTrayIcon', show);
+    const settings = store.get('settings');
+    store.set('settings', {
+      ...settings,
+      showTrayIcon: show
+    });
     return show;
   } catch (error) {
     console.error('Error managing tray icon:', error);
@@ -643,7 +807,7 @@ async function createWindow() {
     icon: path.join(__dirname, '../public/logo_dock.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
-      nodeIntegration: false,
+      nodeIntegration: true,
       contextIsolation: true,
       sandbox: false,
     }
@@ -659,7 +823,10 @@ async function createWindow() {
         await mainWindow.loadURL(`${devServerUrl}/#/settings`);
         console.log('Successfully loaded dev server URL');
         // 开发环境下打开开发者工具
-        mainWindow.webContents.openDevTools();
+        // 只在开发模式下打开 DevTools，且需要设置环境变量
+        if (process.env.OPEN_DEV_TOOLS === 'true') {
+          mainWindow.webContents.openDevTools();
+        }
       } catch (error) {
         console.error('Failed to load dev server URL, falling back to file:', error);
         // 如果连接开发服务器失败，回退到加载本地文件
@@ -779,6 +946,14 @@ function startClipboardMonitoring() {
 
 app.whenReady().then(async () => {
   console.log('App is ready, initializing...');
+  
+  // 检查快捷键是否被其他应用占用
+  const shortcut = store.get('settings.shortcut') as string;
+  if (globalShortcut.isRegistered(shortcut)) {
+    log('Warning: Shortcut is already registered by another application');
+    globalShortcut.unregisterAll();
+    log('Unregistered all shortcuts');
+  }
   
   // 注册 IPC 处理程序
   registerIpcHandlers();

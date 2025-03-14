@@ -60,3 +60,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openStoreDirectory: () => ipcRenderer.invoke('open-store-directory'),
   getHistoryFilePath: () => ipcRenderer.invoke('get-history-file-path')
 } as ElectronAPI)
+
+contextBridge.exposeInMainWorld('electronStore', {
+  get: (key: string) => ipcRenderer.invoke('store-get', key),
+  set: (key: string, value: any) => ipcRenderer.invoke('store-set', key, value),
+  delete: (key: string) => ipcRenderer.invoke('store-delete', key),
+  clear: () => ipcRenderer.invoke('store-clear'),
+  path: () => ipcRenderer.invoke('store-path')
+})
