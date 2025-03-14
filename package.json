@@ -1,7 +1,7 @@
 {
   "name": "ClipHarbor",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.0.2",
   "license": "MIT",
   "description": "A modern clipboard manager for macOS, Windows and Linux",
   "author": {
@@ -23,8 +23,10 @@
     },
     "files": [
       "dist/**/*",
-      "dist-electron/**/*"
+      "dist-electron/**/*",
+      "node_modules/**/*"
     ],
+    "extraResources": [],
     "mac": {
       "category": "public.app-category.utilities",
       "target": [
@@ -55,7 +57,13 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
-    }
+    },
+    "asar": {
+      "smartUnpack": true
+    },
+    "asarUnpack": [
+      "node_modules/electron-store/**/*"
+    ]
   },
   "dependencies": {
     "@emotion/react": "^11.13.5",
@@ -64,7 +72,7 @@
     "@mantine/notifications": "^7.14.3",
     "@types/uuid": "^10.0.0",
     "dayjs": "^1.11.13",
-    "electron-store": "^8.1.0",
+    "electron-store": "^10.0.1",
     "nanoid": "^5.0.9",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -76,16 +84,16 @@
     "@types/node": "^22.10.1",
     "@types/react": "^18.2.64",
     "@types/react-dom": "^18.2.21",
-    "@typescript-eslint/eslint-plugin": "^7.1.1",
-    "@typescript-eslint/parser": "^7.1.1",
-    "@vitejs/plugin-react": "^4.2.1",
-    "electron": "^30.5.1",
-    "electron-builder": "^24.13.3",
-    "eslint": "^8.57.0",
-    "eslint-plugin-react-hooks": "^4.6.0",
-    "eslint-plugin-react-refresh": "^0.4.5",
-    "typescript": "^5.2.2",
-    "vite": "^5.1.6",
+    "@typescript-eslint/eslint-plugin": "^8.26.1",
+    "@typescript-eslint/parser": "^8.26.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^35.0.1",
+    "electron-builder": "^25.1.8",
+    "eslint": "^9.22.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.19",
+    "typescript": "^5.8.2",
+    "vite": "^6.2.1",
     "vite-plugin-electron": "^0.29.0"
   }
 }
