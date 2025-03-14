@@ -518,6 +518,14 @@ function registerIpcHandlers() {
     return true;
   });
 
+  // 添加关闭设置窗口的处理程序
+  ipcMain.handle('close-settings-window', () => {
+    if (mainWindow) {
+      mainWindow.hide();
+    }
+    return true;
+  });
+
   // 注册 Store 相关的处理程序
   registerStoreHandlers();
 }

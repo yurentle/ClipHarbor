@@ -78,6 +78,20 @@ const Settings = () => {
     loadSettings();
   }, []);
 
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        window.electronAPI.closeSettingsWindow();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
   const getTabStyle = (tabValue: string) => ({
     width: '100%',
     height: '48px',
