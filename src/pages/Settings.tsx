@@ -37,6 +37,7 @@ const Settings = () => {
   const [syncing, setSyncing] = useState(false);
   const [syncingLocal, setSyncingLocal] = useState(false);
   const [historyFilePath, setHistoryFilePath] = useState('');
+  const [version, setVersion] = useState('0.0.0');
 
   useEffect(() => {
     const init = async () => {
@@ -76,6 +77,14 @@ const Settings = () => {
       }
     };
     loadSettings();
+  }, []);
+
+  useEffect(() => {
+    const getVersion = async () => {
+      const ver = await window.electronAPI.getAppVersion();
+      setVersion(ver);
+    };
+    getVersion();
   }, []);
 
   useEffect(() => {
@@ -398,7 +407,7 @@ const Settings = () => {
         >
           <Stack>
             <Text fw={500}>关于应用</Text>
-            <Text>版本：0.3.0</Text>
+            <Text>版本：{version}</Text>
             <Text c="dimmed">
               这是一个便捷的剪贴板历史记录管理工具，支持文本、图片和文件的复制记录，
               并提供快速检索和收藏功能。

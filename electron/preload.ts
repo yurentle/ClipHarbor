@@ -23,6 +23,7 @@ interface ElectronAPI {
   openSettingsWindow: () => Promise<boolean>
   closeSettingsWindow: () => Promise<boolean>
   openExternal: (url: string) => Promise<void>
+  getAppVersion: () => Promise<string>
 }
 
 // 使用 contextBridge 暴露 API
@@ -55,7 +56,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return ipcRenderer.invoke('open-settings-window');
   },
   closeSettingsWindow: () => ipcRenderer.invoke('close-settings-window'),
-  openExternal: (url: string) => ipcRenderer.invoke('open-external', url)
+  openExternal: (url: string) => ipcRenderer.invoke('open-external', url),
+  getAppVersion: () => ipcRenderer.invoke('get-app-version')
 } as ElectronAPI)
 
 contextBridge.exposeInMainWorld('electronStore', {

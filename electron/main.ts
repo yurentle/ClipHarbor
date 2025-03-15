@@ -870,3 +870,7 @@ app.on('window-all-closed', () => {
 ipcMain.handle('open-external', async (_, url) => {
   await shell.openExternal(url);
 });
+
+ipcMain.handle('get-app-version', () => {
+  return app.getVersion();
+});

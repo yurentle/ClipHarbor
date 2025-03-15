@@ -16,4 +16,5 @@ export interface ElectronAPI {
   openSettingsWindow: () => Promise<boolean>
   closeSettingsWindow: () => Promise<boolean>
   openExternal: (url: string) => Promise<boolean>
+  getAppVersion: () => Promise<string>
 }
