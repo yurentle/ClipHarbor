@@ -13,8 +13,6 @@ interface ElectronAPI {
   saveToClipboard: (item: any) => Promise<boolean>
   removeFromHistory: (id: string) => Promise<boolean>
   toggleFavorite: (id: string) => Promise<boolean>
-  getShortcut: () => Promise<string>
-  setShortcut: (shortcut: string) => Promise<boolean>
   closeHistoryWindow: () => Promise<void>
   getStoreValue: (key: string) => Promise<any>
   setStoreValue: (key: string, value: any) => Promise<boolean>
@@ -44,8 +42,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveToClipboard: (item: any) => ipcRenderer.invoke('save-to-clipboard', item),
   removeFromHistory: (id: string) => ipcRenderer.invoke('remove-from-history', id),
   toggleFavorite: (id: string) => ipcRenderer.invoke('toggle-favorite', id),
-  getShortcut: () => ipcRenderer.invoke('get-shortcut'),
-  setShortcut: (shortcut: string) => ipcRenderer.invoke('set-shortcut', shortcut),
   closeHistoryWindow: () => ipcRenderer.invoke('close-history-window'),
   getStoreValue: (key: string) => ipcRenderer.invoke('get-store-value', key),
   setStoreValue: (key: string, value: any) => ipcRenderer.invoke('set-store-value', key, value),
@@ -53,7 +49,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   syncDataFromCloud: (config: string) => ipcRenderer.invoke('sync-data-from-cloud', config),
   openStoreDirectory: () => ipcRenderer.invoke('open-store-directory'),
   getHistoryFilePath: () => ipcRenderer.invoke('get-history-file-path'),
-  openSettingsWindow: () => ipcRenderer.invoke('open-settings-window'),
+  openSettingsWindow: () => {
+    console.log('Preload: Calling openSettingsWindow');
+    return ipcRenderer.invoke('open-settings-window');
+  },
   closeSettingsWindow: () => ipcRenderer.invoke('close-settings-window')
 } as ElectronAPI)
 

@@ -291,7 +291,14 @@ function History() {
         <ActionIcon
           variant="light"
           color="gray"
-          onClick={() => window.electronAPI.openSettingsWindow()}
+          onClick={async () => {
+            console.log('History: Clicking settings button'); // 添加调试日志
+            try {
+              await window.electronAPI.openSettingsWindow();
+            } catch (error) {
+              console.error('Error opening settings window:', error);
+            }
+          }}
         >
           <Settings size={16} />
         </ActionIcon>

@@ -41,7 +41,7 @@ const Settings = () => {
   useEffect(() => {
     const init = async () => {
       try {
-        const defaultShortcut = await window.electronAPI.getShortcut();
+        const defaultShortcut = await window.electronAPI.getStoreValue('shortcut');
         setShortcut(defaultShortcut);
       } catch (error) {
         console.error('Error initializing settings:', error);
@@ -131,14 +131,13 @@ const Settings = () => {
   };
 
   const handleBlur = async () => {
-    // 当输入框失去焦点时设置新的快捷键
     if (shortcut.split('+').length > 1) {
       try {
-        const success = await window.electronAPI.setShortcut(shortcut);
+        const success = await window.electronAPI.setStoreValue('shortcut', shortcut);
         if (!success) {
           setShortcutError('无效的快捷键组合');
         } else {
-          setShortcut(shortcut); // 更新显示的快捷键
+          setShortcut(shortcut);
           setShortcutError('');
         }
       } catch (error) {

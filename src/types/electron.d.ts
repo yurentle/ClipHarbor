@@ -6,8 +6,6 @@ export interface ElectronAPI {
   saveToClipboard: (item: ClipboardItem) => Promise<void>
   removeFromHistory: (id: string) => Promise<void>
   toggleFavorite: (id: string) => Promise<void>
-  getShortcut: () => Promise<string>
-  setShortcut: (shortcut: string) => Promise<void>
   closeHistoryWindow: () => Promise<void>
   getStoreValue: (key: string) => Promise<any>
   setStoreValue: (key: string, value: any) => Promise<boolean>
