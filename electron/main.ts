@@ -866,3 +866,7 @@ app.on('window-all-closed', () => {
     app.quit();
   }
 });
+
+ipcMain.handle('open-external', async (_, url) => {
+  await shell.openExternal(url);
+});

@@ -15,4 +15,5 @@ export interface ElectronAPI {
   getHistoryFilePath: () => Promise<string>
   openSettingsWindow: () => Promise<boolean>
   closeSettingsWindow: () => Promise<boolean>
+  openExternal: (url: string) => Promise<boolean>
 }

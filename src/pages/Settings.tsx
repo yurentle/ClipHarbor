@@ -223,7 +223,7 @@ const Settings = () => {
   };
 
   return (
-    <div style={{ height: '100vh', padding: '20px' }}>
+    <div style={{ height: '100vh', padding: '10px' }}>
       <Tabs 
         value={activeTab} 
         onChange={(value) => setActiveTab(value || 'shortcuts')}
@@ -236,7 +236,7 @@ const Settings = () => {
       >
         <Tabs.List 
           style={{ 
-            width: '160px', 
+            width: '120px', 
             borderRight: `1px solid ${theme.colors.gray[3]}`,
             padding: '8px 0'
           }}
@@ -280,7 +280,7 @@ const Settings = () => {
           }}
         >
           <Stack>
-            <Text size="lg">快捷键设置</Text>
+            <Text fw={500}>快捷键设置</Text>
             <TextInput
               label=""
               placeholder={isInputFocused ? '请按下快捷键组合...' : '点击此处设置快捷键'}
@@ -305,7 +305,7 @@ const Settings = () => {
           }}
         >
           <Stack>
-            <Text size="sm">保留时长设置</Text>
+            <Text fw={500}>保留时长设置</Text>
             <Group>
               {retentionUnit !== 'permanent' && (
                 <NumberInput
@@ -346,7 +346,7 @@ const Settings = () => {
           }}
         >
           <Stack>
-            <Text size="lg">数据存储设置</Text>
+            <Text fw={500}>数据存储设置</Text>
             <Group>
               <Text size="sm">本地数据存储位置</Text>
               <Button 
@@ -354,11 +354,12 @@ const Settings = () => {
                 size="xs" 
                 onClick={() => window.electronAPI.openStoreDirectory()}
               >
-                {historyFilePath}
+                .../
+                {historyFilePath.split('/').slice(-2).join('/')}
               </Button>
             </Group>
+            <Text fw={500}>Rclone 配置</Text>
             <TextInput
-              label="Rclone 配置"
               placeholder="请输入 rclone 配置，例如：remote:history"
               value={rcloneConfig}
               onChange={(e) => setRcloneConfig(e.target.value)}
@@ -397,10 +398,11 @@ const Settings = () => {
         >
           <Stack>
             <Text fw={500}>关于应用</Text>
-            <Text>版本：1.0.0</Text>
+            <Text>版本：0.3.0</Text>
             <Text c="dimmed">
               这是一个便捷的剪贴板历史记录管理工具，支持文本、图片和文件的复制记录，
               并提供快速检索和收藏功能。
+              支持 rclone 同步到云端和从云端同步到本地。
             </Text>
             
             <Group mt="md">
@@ -409,17 +411,12 @@ const Settings = () => {
                 leftSection={<BrandGithub size={16} />}
                 component="a"
                 href="https://github.com/yurentle/ClipHarbor"
-                target="_blank"
+                onClick={(e) => {
+                  e.preventDefault();
+                  window.electronAPI.openExternal("https://github.com/yurentle/ClipHarbor");
+                }}
               >
                 GitHub
-              </Button>
-              <Button 
-                variant="light" 
-                leftSection={<Mail size={16} />}
-                component="a"
-                href="mailto:yurentle@gmail.com"
-              >
-                联系我们
               </Button>
             </Group>
           </Stack>
