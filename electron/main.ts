@@ -13,8 +13,8 @@ declare global {
 
 let mainWindow: BrowserWindow | null = null
 let historyWindow: BrowserWindow | null = null
-let tray: Tray | null = null;
 let contextMenu: Menu | null = null;
+const isMac = process.platform === 'darwin';
 
 // 在文件开头添加错误处理
 process.on('uncaughtException', (error) => {
@@ -89,7 +89,7 @@ class BackupStore implements IStore {
     this.data = {
       clipboardHistory: [] as ClipboardItem[],
       settings: {
-        shortcut: process.platform === 'darwin' ? 'CommandOrControl+Shift+V' : 'Ctrl+Shift+V',
+        shortcut: isMac ? 'CommandOrControl+Shift+V' : 'Ctrl+Shift+V',
         retentionPeriod: 30,
         retentionUnit: 'days'
       }
@@ -115,7 +115,7 @@ try {
   const data: StoreSchema = {
     clipboardHistory: [] as ClipboardItem[],
     settings: {
-      shortcut: process.platform === 'darwin' ? 'CommandOrControl+Shift+V' : 'Ctrl+Shift+V',
+      shortcut: isMac ? 'CommandOrControl+Shift+V' : 'Ctrl+Shift+V',
       retentionPeriod: 30,
       retentionUnit: 'days'
     }
@@ -126,7 +126,7 @@ try {
   console.error('Failed to initialize store:', error);
   
   const defaultSettings: StoreSchema['settings'] = {
-    shortcut: process.platform === 'darwin' ? 'CommandOrControl+Shift+V' : 'Ctrl+Shift+V',
+    shortcut: isMac ? 'CommandOrControl+Shift+V' : 'Ctrl+Shift+V',
     retentionPeriod: 30,
     retentionUnit: 'days'
   };
@@ -301,7 +301,7 @@ function registerIpcHandlers() {
     return true
   })
 
-  const defaultShortcut = process.platform === 'darwin' ? 'Command+Shift+V' : 'Ctrl+Shift+V';
+  const defaultShortcut = isMac ? 'Command+Shift+V' : 'Ctrl+Shift+V';
   
   // 获取设置的快捷键
   ipcMain.handle('get-shortcut', () => {
@@ -532,7 +532,7 @@ function registerIpcHandlers() {
 
 // 注册快捷键
 function registerShortcuts() {
-  const defaultShortcut = process.platform === 'darwin' ? 'CommandOrControl+Shift+V' : 'Ctrl+Shift+V';
+  const defaultShortcut = isMac ? 'CommandOrControl+Shift+V' : 'Ctrl+Shift+V';
   const settings = store.get('settings') as StoreSchema['settings'];
   const currentShortcut = settings?.shortcut || defaultShortcut;
   log('Using shortcut:', currentShortcut);
@@ -557,9 +557,6 @@ function registerShortcuts() {
   }
 }
 
-// 存储当前快捷键
-let currentShortcut = process.platform === 'darwin' ? 'Command+Shift+V' : 'Ctrl+Shift+V';
-
 // 广播剪贴板变化到所有窗口
 function broadcastClipboardChange(item: ClipboardItem) {
   if (mainWindow) {
@@ -583,7 +580,7 @@ async function createHistoryWindow() {
   historyWindow = new BrowserWindow({
     width: 600,
     height: 800,
-    icon: path.join(__dirname, '../public/logo_dock.png'),
+    icon: path.join(__dirname, '../public/icons/logo_dock.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: true,
@@ -700,7 +697,7 @@ async function createHistoryWindow() {
 
 // 创建托盘图标
 function createTrayIcon(): Tray {
-  const icon = nativeImage.createFromPath(path.join(__dirname, '../public/logo_tray.png'));
+  const icon = nativeImage.createFromPath(path.join(__dirname, '../public/icons/logo_tray_Template@2x.png'));
   const newTray = new Tray(icon);
   newTray.setToolTip('ClipHarbor');
   contextMenu = contextMenu || createContextMenu();
@@ -745,7 +742,7 @@ async function createWindow() {
   mainWindow = new BrowserWindow({
     width: 700,
     height: 480,
-    icon: path.join(__dirname, '../public/logo_dock.png'),
+    icon: path.join(__dirname, '../public/icons/logo_dock.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: true,
@@ -888,9 +885,10 @@ function startClipboardMonitoring() {
 app.whenReady().then(async () => {
   console.log('App is ready, initializing...');
   
-  // 在 macOS 上默认隐藏 Dock 图标
-  if (process.platform === 'darwin') {
-    app.dock.hide();
+  // 在 macOS 上设置 Dock 图标
+  if (isMac) {
+    // app.dock.hide(); // 注释掉这行，让 Dock 图标显示
+    app.dock.setIcon(path.join(__dirname, '../public/icons/logo_dock.png'));
   }
   
   // 检查快捷键是否被其他应用占用
@@ -944,12 +942,12 @@ app.whenReady().then(async () => {
     // 清理窗口引用
     mainWindow = null;
     historyWindow = null;
-    tray = null;
+    // tray = null;
   });
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
+  if (!isMac) {
     app.quit();
   }
 });

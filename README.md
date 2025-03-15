@@ -2,7 +2,7 @@
 
 # ClipHarbor
 
-<img src="public/logo_dock.png" alt="ClipHarbor Logo" width="128" height="128">
+<img src="public/icons/logo_dock.png" alt="ClipHarbor Logo" width="128" height="128">
 
 [![GitHub release](https://img.shields.io/github/v/release/yurentle/ClipHarbor)](https://github.com/yurentle/ClipHarbor/releases)
 [![GitHub stars](https://img.shields.io/github/stars/yurentle/ClipHarbor)](https://github.com/yurentle/ClipHarbor/stargazers)

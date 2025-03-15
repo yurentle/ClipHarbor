@@ -33,21 +33,22 @@
         "dmg",
         "zip"
       ],
-      "icon": "public/logo_dock.png"
+      "icon": "public/icons/logo.icns",
+      "darkModeSupport": true
     },
     "win": {
       "target": [
         "nsis",
         "portable"
       ],
-      "icon": "public/logo_dock.png"
+      "icon": "public/icons/logo.ico"
     },
     "linux": {
       "target": [
         "AppImage",
         "deb"
       ],
-      "icon": "public/logo_dock.png",
+      "icon": "public/icons",
       "category": "Utility",
       "maintainer": "yurentle <yurentle@gmail.com>",
       "description": "A modern clipboard manager for macOS, Windows and Linux"
