@@ -24,9 +24,16 @@
     "files": [
       "dist/**/*",
       "dist-electron/**/*",
-      "node_modules/**/*"
+      "node_modules/**/*",
+      "electron/preload.js"
     ],
-    "extraResources": [],
+    "extraResources": [
+      {
+        "from": "build/icons",
+        "to": "icons",
+        "filter": ["**/*"]
+      }
+    ],
     "mac": {
       "category": "public.app-category.utilities",
       "target": [

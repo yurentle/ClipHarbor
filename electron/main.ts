@@ -11,12 +11,60 @@ declare global {
   var clipboardInterval: NodeJS.Timeout | undefined;
 }
 
-let settingWindow: BrowserWindow | null = null
-let historyWindow: BrowserWindow | null = null
-let contextMenu: Menu | null = null;
+// 1. 基本常量定义
 const isMac = process.platform === 'darwin';
+const historyFileName = 'clipboard-history.json';
+const __dirname = path.dirname(__filename);
 
-// 在文件开头添加错误处理
+// 2. 日志相关设置
+const getLogPath = () => {
+  const userDataPath = app.getPath('userData');
+  return app.isPackaged 
+    ? path.join(userDataPath, 'logs')
+    : path.join(userDataPath, 'logs-dev');
+};
+
+const logPath = getLogPath();
+log('Log path:', logPath);  // 添加这行来调试路径
+
+// 确保日志目录存在
+try {
+  if (!fs.existsSync(logPath)) {
+    fs.mkdirSync(logPath, { recursive: true });
+    console.log('Created log directory at:', logPath);
+  }
+} catch (error) {
+  console.error('Failed to create log directory:', error);
+}
+
+const logFile = path.join(logPath, `app-${new Date().toISOString().split('T')[0]}.log`);
+
+// 创建日志函数
+function log(...args: any[]) {
+  const message = args.map(arg => 
+    typeof arg === 'object' ? JSON.stringify(arg) : arg
+  ).join(' ');
+  
+  const timestamp = new Date().toISOString();
+  const logMessage = `[${timestamp}] ${message}\n`;
+  
+  try {
+    // 写入日志文件
+    fs.appendFileSync(logFile, logMessage);
+    // 同时输出到控制台
+    console.log(message);
+  } catch (error) {
+    console.error('Failed to write to log file:', error);
+  }
+}
+
+// 3. 全局变量声明
+let settingWindow: BrowserWindow | null = null;
+let historyWindow: BrowserWindow | null = null;
+let contextMenu: Menu | null = null;
+let isQuitting = false;
+
+// 4. 错误处理
 process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error);
   if (error.message.includes('Cannot find module')) {
@@ -24,7 +72,7 @@ process.on('uncaughtException', (error) => {
   }
 });
 
-// 在文件开头添加类型定义
+// 5. 类型定义
 interface StoreSchema {
   clipboardHistory: ClipboardItem[];
   settings: {
@@ -40,7 +88,7 @@ type StoreKey = string;
 // 修改存储接口
 interface IStore {
   get(key: StoreKey, defaultValue?: any): any;
-  set(key: StoreKey, value: any): void;
+  set(key: StoreKey, value: any): boolean;
   delete(key: StoreKey): void;
   clear(): void;
   path: string;
@@ -53,6 +101,7 @@ class BackupStore implements IStore {
   private emitter: EventEmitter;
   readonly path: string;
   private filePath: string;
+  private isDirty: boolean = false;  // 添加一个标记来追踪数据是否被修改
 
   constructor(defaultData: StoreSchema, storePath: string) {
     this.data = defaultData;
@@ -62,9 +111,6 @@ class BackupStore implements IStore {
 
     // 尝试从文件加载数据
     this.loadFromFile();
-
-    // 定期保存数据到文件
-    setInterval(() => this.saveToFile(), 1000);
   }
 
   private loadFromFile() {
@@ -83,11 +129,14 @@ class BackupStore implements IStore {
   }
 
   private saveToFile() {
+    if (!this.isDirty) return;  // 如果数据没有修改，不需要保存
+
     try {
       // 确保目录存在
       fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
       // 保存数据到文件
       fs.writeFileSync(this.filePath, JSON.stringify(this.data, null, 2));
+      this.isDirty = false;  // 重置修改标记
     } catch (error) {
       console.error('Error saving data to file:', error);
     }
@@ -109,10 +158,17 @@ class BackupStore implements IStore {
     return value === undefined ? defaultValue : value;
   }
 
-  set(key: StoreKey, value: any): void {
-    this.setNestedValue(this.data, key, value);
-    this.emitter.emit('change', key, value);
-    this.saveToFile(); // 当数据变化时保存到文件
+  set(key: StoreKey, value: any): boolean {
+    try {
+      this.setNestedValue(this.data, key, value);
+      this.emitter.emit('change', key, value);
+      this.isDirty = true;  // 标记数据已修改
+      this.saveToFile();    // 立即保存修改
+      return true;
+    } catch (error) {
+      console.error('Error setting store value:', error);
+      return false;
+    }
   }
 
   delete(key: StoreKey): void {
@@ -145,7 +201,7 @@ class BackupStore implements IStore {
   }
 }
 
-// 修改 store 的初始化
+// 7. Store 初始化
 let store: IStore;
 
 try {
@@ -179,14 +235,6 @@ try {
 // 打印存储路径
 log('Store path:', store.path);
 
-const historyFileName = 'clipboard-history.json';
-
-// 创建日志函数
-function log(...args: any[]) {
-  const time = new Date().toISOString();
-  console.log(`[${time}]`, ...args);
-}
-
 // Debug: 打印初始配置
 log('Initial store settings:', JSON.stringify(store.get('settings'), null, 2));
 
@@ -197,8 +245,6 @@ store.onDidChange('settings', (newValue, oldValue) => {
     '\nNew:', JSON.stringify(newValue, null, 2)
   );
 });
-
-const __dirname = path.dirname(__filename)
 
 function getImageMetadata(dataUrl: string): { width: number; height: number; size: number } {
   const img = nativeImage.createFromDataURL(dataUrl)
@@ -213,74 +259,51 @@ function getImageMetadata(dataUrl: string): { width: number; height: number; siz
 }
 
 // 修改 ShortcutManager 类
-class ShortcutManager {
-  private currentShortcut: string | null = null;
-
-  constructor(private readonly _defaultShortcut: string) {}
-
-  get defaultShortcut(): string {
-    return this._defaultShortcut;
-  }
-
-  private async shortcutHandler() {
-    log('Shortcut triggered');
-    if (historyWindow?.isVisible()) {
-      historyWindow.hide();
-    } else {
-      await createHistoryWindow();
-    }
-  }
+const shortcutManager = {
+  defaultShortcut: isMac ? 'Command+Shift+V' : 'Ctrl+Shift+V',
+  currentShortcut: '',
 
   register(shortcut: string): boolean {
     try {
-      log('Registering shortcut:', shortcut);
-      
-      // 先注销当前快捷键
-      this.unregister();
+      // 先注销之前的快捷键
+      if (this.currentShortcut) {
+        globalShortcut.unregister(this.currentShortcut);
+      }
 
-      // // 检查快捷键是否已被其他应用注册
-      // if (globalShortcut.isRegistered(shortcut)) {
-      //   log('Warning: Shortcut is already registered by another application:', shortcut);
-      //   return false;
-      // }
+      // 注册新快捷键
+      const success = globalShortcut.register(shortcut, async () => {
+        log('Shortcut triggered:', shortcut);
+        if (historyWindow) {
+          if (historyWindow.isVisible()) {
+            historyWindow.hide();
+          } else {
+            historyWindow.show();
+            historyWindow.focus();
+          }
+        } else {
+          await createHistoryWindow();
+        }
+      });
 
-      // 创建快捷键处理函数的绑定版本
-      const boundHandler = this.shortcutHandler.bind(this);
-      const success = globalShortcut.register(shortcut, boundHandler);
-      
       if (success) {
         this.currentShortcut = shortcut;
         log('Shortcut registered successfully:', shortcut);
-        return true;
+      } else {
+        log('Failed to register shortcut:', shortcut);
       }
-      
-      log('Failed to register shortcut:', shortcut);
-      return false;
-    } catch (error) {
-      console.error('Error registering shortcut:', error);
-      return false;
-    }
-  }
 
-  unregister() {
-    if (this.currentShortcut) {
-      globalShortcut.unregister(this.currentShortcut);
-      log('Shortcut unregistered:', this.currentShortcut);
-      this.currentShortcut = null;
+      return success;
+    } catch (error) {
+      log('Error registering shortcut:', error);
+      return false;
     }
-  }
+  },
 
   unregisterAll() {
     globalShortcut.unregisterAll();
-    this.currentShortcut = null;
-    log('All shortcuts unregistered');
+    this.currentShortcut = '';
   }
-}
-
-// 使用快捷键管理类
-const shortcutManager = new ShortcutManager(
-  isMac ? 'Command+Shift+V' : 'Ctrl+Shift+V'
-);
+};
 
 // 创建一个函数来处理所有与 Store 相关的 IPC 通信
 function registerStoreHandlers() {
@@ -337,11 +360,17 @@ function registerIpcHandlers() {
   })
 
   // 从历史记录中删除
-  ipcMain.handle('remove-from-history', (_, id: string) => {
-    const history = store.get('clipboardHistory', []) as ClipboardItem[]
-    const newHistory = history.filter(item => item.id !== id)
-    store.set('clipboardHistory', newHistory)
-    return true
+  ipcMain.handle('remove-from-history', async (_, id: string) => {
+    try {
+      const history = store.get('clipboardHistory', []) as ClipboardItem[]
+      const newHistory = history.filter(item => item.id !== id)
+      await store.set('clipboardHistory', newHistory)
+      console.log('removeFromHistory success, new length:', newHistory.length);
+      return true
+    } catch (error) {
+      console.error('Error removing from history:', error);
+      return false
+    }
   })
 
   // 切换收藏状态
@@ -634,11 +663,11 @@ function setupHistoryWindowEvents(win: BrowserWindow) {
 
   win.on('hide', () => {
     // 确保窗口完全隐藏后再注册快捷键
-    setImmediate(() => {
-      const settings = store.get('settings') as StoreSchema['settings'];
-      const shortcut = settings?.shortcut || shortcutManager.defaultShortcut;
-      shortcutManager.register(shortcut);
-    });
+    // setImmediate(() => {
+    //   const settings = store.get('settings') as StoreSchema['settings'];
+    //   const shortcut = settings?.shortcut || shortcutManager.defaultShortcut;
+    //   shortcutManager.register(shortcut);
+    // });
   });
 
   win.on('blur', () => {
@@ -650,23 +679,27 @@ function setupHistoryWindowEvents(win: BrowserWindow) {
   win.on('closed', () => {
     historyWindow = null;
     // 确保窗口完全关闭后再注册快捷键
-    setImmediate(() => {
-      const settings = store.get('settings') as StoreSchema['settings'];
-      const shortcut = settings?.shortcut || shortcutManager.defaultShortcut;
-      shortcutManager.register(shortcut);
-    });
+    // setImmediate(() => {
+    //   const settings = store.get('settings') as StoreSchema['settings'];
+    //   const shortcut = settings?.shortcut || shortcutManager.defaultShortcut;
+    //   shortcutManager.register(shortcut);
+    // });
   });
 }
 
 // 设置主窗口的事件监听
 function setupSettingWindowEvents(win: BrowserWindow) {
   win.on('closed', () => {
+    log('Setting window closed');
     settingWindow = null;
   });
 
   win.on('close', (event) => {
-    event.preventDefault();
-    win.hide();
+    if (!isQuitting) {  // 使用我们自己的 isQuitting 变量，而不是 app.isQuitting
+      event.preventDefault();
+      win.hide();
+      log('Setting window hidden');
+    }
   });
 }
 
@@ -687,12 +720,34 @@ async function createHistoryWindow() {
 
 // 创建托盘图标
 function createTrayIcon(): Tray {
-  const icon = nativeImage.createFromPath(path.join(__dirname, '../public/icons/logo_tray_Template@2x.png'));
-  const newTray = new Tray(icon);
-  newTray.setToolTip('ClipHarbor');
+  log('createTrayIcon');
+  let iconPath: string;
+  
+  if (app.isPackaged) {
+    // 在打包的应用中使用 process.resourcesPath
+    iconPath = path.join(process.resourcesPath, 'icons/logo_tray_Template.png');
+  } else {
+    // 在开发环境中使用项目目录
+    iconPath = path.join(__dirname, '../public/icons/logo_tray_Template@2x.png');
+  }
+
+  log('App path:', app.getAppPath());
+  log('Is packaged:', app.isPackaged);
+  log('Resource path:', process.resourcesPath);
+  log('Tray icon path:', iconPath);
+
+  const icon = nativeImage.createFromPath(iconPath);
+  if (icon.isEmpty()) {
+    log('Error: Failed to load tray icon from path:', iconPath);
+  } else {
+    log('Success: Icon loaded successfully');
+  }
+
+  const tray = new Tray(icon);
+  tray.setToolTip('ClipHarbor');
   contextMenu = contextMenu || createContextMenu();
-  newTray.setContextMenu(contextMenu);
-  return newTray;
+  tray.setContextMenu(contextMenu);
+  return tray;
 }
 
 // 创建托盘菜单
@@ -707,6 +762,7 @@ function createContextMenu(): Menu {
     {
       label: '退出',
       click: () => {
+        isQuitting = true;  // 设置退出标志
         app.quit();
       }
     }
@@ -724,32 +780,35 @@ function startClipboardMonitoring() {
   global.clipboardInterval = setInterval(() => {
     try {
       // 检查是否有文件
-      const filePaths = clipboard.readBuffer('FileNameW');
-      if (filePaths.length > 0) {
-        try {
-          const files = clipboard.readBuffer('FileNameW').toString('ucs2').replace(/\\/g, '/').split('\0').filter(Boolean);
-          if (files.length > 0 && files.join(',') !== lastContent) {
-            lastContent = files.join(',');
-            const history = store.get('clipboardHistory', []) as ClipboardItem[];
-            const newItem: ClipboardItem = {
-              id: uuidv4(),
-              content: files.join(','),
-              type: 'text',
-              timestamp: Date.now(),
-              favorite: false
-            }
-            const newHistory = [newItem, ...history.filter(item => item.content !== newItem.content)];
-            store.set('clipboardHistory', newHistory);
-            broadcastClipboardChange(newItem);
-          }
-        } catch (error) {
-          console.error('Error processing file paths:', error);
-        }
-        return;
-      }
+      // const filePaths = clipboard.readBuffer('FileNameW');
+      // console.log('filePaths', filePaths.length);
+      // if (filePaths.length > 0) {
+      //   console.log('filePaths.has.length');
+      //   try {
+      //     const files = clipboard.readBuffer('FileNameW').toString('ucs2').replace(/\\/g, '/').split('\0').filter(Boolean);
+      //     if (files.length > 0 && files.join(',') !== lastContent) {
+      //       lastContent = files.join(',');
+      //       const history = store.get('clipboardHistory', []) as ClipboardItem[];
+      //       const newItem: ClipboardItem = {
+      //         id: uuidv4(),
+      //         content: files.join(','),
+      //         type: 'text',
+      //         timestamp: Date.now(),
+      //         favorite: false
+      //       }
+      //       const newHistory = [newItem, ...history.filter(item => item.content !== newItem.content)];
+      //       store.set('clipboardHistory', newHistory);
+      //       broadcastClipboardChange(newItem);
+      //     }
+      //   } catch (error) {
+      //     console.error('Error processing file paths:', error);
+      //   }
+      //   return;
+      // }
 
       // 检查是否有图片
       const image = clipboard.readImage();
+      // console.log(new Date().toISOString(), 'image.isEmpty()', image.isEmpty());
       if (!image.isEmpty()) {
         const dataUrl = image.toDataURL();
         if (dataUrl !== lastImage) {
@@ -771,7 +830,9 @@ function startClipboardMonitoring() {
       } else {
         // 检查文本内容
         const text = clipboard.readText();
+        // console.log(new Date().toISOString(), 'text.content', text);
         if (text && text !== lastContent) {
+          console.log('save text');
           lastContent = text;
           const history = store.get('clipboardHistory', []) as ClipboardItem[];
           const newItem: ClipboardItem = {
@@ -796,67 +857,119 @@ function startClipboardMonitoring() {
 
 app.whenReady().then(async () => {
   try {
-    console.log('App is ready, initializing...');
+    log('App is ready, initializing...');
+    log('Resource path:', process.resourcesPath);
+    log('App path:', app.getAppPath());
+    log('Current directory:', __dirname);
     
+    // 注册 IPC 处理程序
+    registerIpcHandlers();
+
     // 立即创建并显示设置窗口
     log('Creating settings window...');
     await createSettingWindow();
 
     if (isMac) {
-      app.dock.setIcon(path.join(__dirname, '../public/icons/logo_dock.png'));
+      try {
+        const dockIconPath = app.isPackaged
+          ? path.join(process.resourcesPath, 'icons/logo_dock.png')
+          : path.join(__dirname, '../public/icons/logo_dock.png');
+        
+        log('Setting dock icon:', dockIconPath);
+        app.dock.setIcon(dockIconPath);
+        app.dock.setMenu(Menu.buildFromTemplate([
+          {
+            label: '退出',
+            click: () => {
+              isQuitting = true;
+              app.quit();
+            }
+          }
+        ]));
+      } catch (dockError) {
+        log('Error setting dock icon:', dockError);
+      }
     }
 
-    // 创建托盘图标
-    createTrayIcon();
-
-    // 注册 IPC 处理程序
-    registerIpcHandlers();
-
-    // 开始监听剪贴板
-    startClipboardMonitoring();
-
-    // 确保设置窗口创建完成后再注册快捷键
-    log('Registering shortcuts...');
-    const settings = store.get('settings') as StoreSchema['settings'];
-    const shortcut = settings?.shortcut || shortcutManager.defaultShortcut;
-    const registered = shortcutManager.register(shortcut);
-    
-    if (!registered) {
-      log('Failed to register initial shortcut, trying default shortcut');
-      shortcutManager.register(shortcutManager.defaultShortcut);
+    try {
+      // 创建托盘图标
+      log('Creating tray icon...');
+      createTrayIcon();
+    } catch (trayError) {
+      log('Error creating tray icon:', trayError);
     }
 
+    try {
+      // 开始监听剪贴板
+      log('Starting clipboard monitoring...');
+      startClipboardMonitoring();
+    } catch (clipboardError) {
+      log('Error starting clipboard monitoring:', clipboardError);
+    }
+
+    try {
+      // 注册快捷键
+      log('Registering shortcuts...');
+      const settings = store.get('settings') as StoreSchema['settings'];
+      const shortcut = settings?.shortcut || shortcutManager.defaultShortcut;
+      const registered = shortcutManager.register(shortcut);
+      
+      if (!registered) {
+        log('Failed to register initial shortcut, trying default shortcut');
+        shortcutManager.register(shortcutManager.defaultShortcut);
+      }
+    } catch (shortcutError) {
+      log('Error registering shortcuts:', shortcutError);
+    }
+
+    // 设置事件监听器
     app.on('activate', async () => {
-      if (!settingWindow) {
-        await createSettingWindow();
-      } else {
+      log('App activated from dock');
+      if (settingWindow) {
         settingWindow.show();
+        settingWindow.focus();
+      } else {
+        await createSettingWindow();
       }
     });
 
-    // 在应用退出前注销所有快捷键
     app.on('will-quit', () => {
+      log('App will quit, unregistering shortcuts');
       globalShortcut.unregisterAll();
     });
 
-    // 当应用退出前，清理资源
     app.on('before-quit', () => {
-      // 停止剪贴板监控
+      log('App is quitting...');
+      isQuitting = true;
+      
       if (global.clipboardInterval) {
         clearInterval(global.clipboardInterval);
       }
       
-      // 关闭所有窗口
       BrowserWindow.getAllWindows().forEach(window => {
         window.destroy();
       });
       
-      // 清理窗口引用
       settingWindow = null;
       historyWindow = null;
     });
 
   } catch (error) {
+    // 更详细的错误日志
+    log('Error during app initialization:');
+    log('Error name:', error?.name);
+    log('Error message:', error?.message);
+    log('Error stack:', error?.stack);
+    if (error instanceof Error) {
+      log('Full error object:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+        ...error
+      });
+    } else {
+      log('Non-Error object thrown:', error);
+    }
     console.error('Error during app initialization:', error);
   }
 });

@@ -1,30 +1,32 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import { ElectronAPI } from '../src/types/electron'
+import { BrowserWindow } from 'electron'
 
 // 为了 TypeScript 的类型检查
-declare global {
-  interface Window {
-    electronAPI: ElectronAPI
-  }
-}
+// declare global {
+//   interface Window {
+//     electronAPI: ElectronAPI
+//   }
+// }
 
-interface ElectronAPI {
-  onClipboardChange: (callback: (content: any) => void) => () => void
-  getClipboardHistory: () => Promise<any[]>
-  saveToClipboard: (item: any) => Promise<boolean>
-  removeFromHistory: (id: string) => Promise<boolean>
-  toggleFavorite: (id: string) => Promise<boolean>
-  closeHistoryWindow: () => Promise<void>
-  getStoreValue: (key: string) => Promise<any>
-  setStoreValue: (key: string, value: any) => Promise<boolean>
-  syncData: (config: string) => Promise<boolean>
-  syncDataFromCloud: (config: string) => Promise<boolean>
-  openStoreDirectory: () => Promise<void>
-  getHistoryFilePath: () => Promise<string>
-  openSettingsWindow: () => Promise<boolean>
-  closeSettingsWindow: () => Promise<boolean>
-  openExternal: (url: string) => Promise<void>
-  getAppVersion: () => Promise<string>
-}
+// interface ElectronAPI {
+//   onClipboardChange: (callback: (content: any) => void) => () => void
+//   getClipboardHistory: () => Promise<any[]>
+//   saveToClipboard: (item: any) => Promise<boolean>
+//   removeFromHistory: (id: string) => Promise<boolean>
+//   toggleFavorite: (id: string) => Promise<boolean>
+//   closeHistoryWindow: () => Promise<void>
+//   getStoreValue: (key: string) => Promise<any>
+//   setStoreValue: (key: string, value: any) => Promise<boolean>
+//   syncData: (config: string) => Promise<boolean>
+//   syncDataFromCloud: (config: string) => Promise<boolean>
+//   openStoreDirectory: () => Promise<void>
+//   getHistoryFilePath: () => Promise<string>
+//   openSettingsWindow: () => Promise<boolean>
+//   closeSettingsWindow: () => Promise<boolean>
+//   openExternal: (url: string) => Promise<void>
+//   getAppVersion: () => Promise<string>
+// }
 
 // 使用 contextBridge 暴露 API
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -57,13 +59,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   closeSettingsWindow: () => ipcRenderer.invoke('close-settings-window'),
   openExternal: (url: string) => ipcRenderer.invoke('open-external', url),
-  getAppVersion: () => ipcRenderer.invoke('get-app-version')
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+  isDevToolsOpened: () => {
+    const win = BrowserWindow.getFocusedWindow();
+    return win?.webContents.isDevToolsOpened() ?? false;
+  }
 } as ElectronAPI)
 
-contextBridge.exposeInMainWorld('electronStore', {
-  get: (key: string) => ipcRenderer.invoke('store-get', key),
-  set: (key: string, value: any) => ipcRenderer.invoke('store-set', key, value),
-  delete: (key: string) => ipcRenderer.invoke('store-delete', key),
-  clear: () => ipcRenderer.invoke('store-clear'),
-  path: () => ipcRenderer.invoke('store-path')
+// 通过 contextBridge 暴露安全的 API 给渲染进程
+contextBridge.exposeInMainWorld('electron', {
+  ipcRenderer,
+  store: {
+    get: (key: string) => ipcRenderer.invoke('get-store-value', key),
+    set: (key: string, value: any) => ipcRenderer.invoke('set-store-value', key, value),
+    openDirectory: () => ipcRenderer.invoke('open-store-directory')
+  }
 })
