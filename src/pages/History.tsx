@@ -285,6 +285,22 @@ function History() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
 
+  // 添加失焦自动隐藏功能
+  useEffect(() => {
+    const handleBlur = async () => {
+      // 如果开发者工具打开，不隐藏窗口
+      if (!window.electronAPI.isDevToolsOpened?.()) {
+        await window.electronAPI.closeHistoryWindow();
+      }
+    };
+
+    window.addEventListener('blur', handleBlur);
+
+    return () => {
+      window.removeEventListener('blur', handleBlur);
+    };
+  }, []);
+
   return (
     <Container p="xs" 
       style={{ 
