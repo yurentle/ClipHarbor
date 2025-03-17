@@ -172,10 +172,24 @@ function History() {
   }
 
   const handleRemove = async (id: string) => {
+    console.log('Starting delete operation for id:', id);
     try {
       const success = await window.electronAPI.removeFromHistory(id);
+      console.log('removeFromHistory result:', success);
+      
       if (success) {
-        setClipboardHistory(prev => prev.filter(item => item.id !== id));
+        console.log('Updating states after successful deletion');
+        setClipboardHistory(prev => {
+          console.log('Previous history length:', prev.length);
+          const newHistory = prev.filter(item => item.id !== id);
+          // 更新过滤后的历史记录
+          const filtered = filterHistory(newHistory, searchQuery, category);
+          setFilteredHistory(filtered);
+          // 更新显示的历史记录
+          setDisplayedHistory(filtered.slice(0, ITEMS_PER_PAGE));
+          setHasMore(filtered.length > ITEMS_PER_PAGE);
+          return newHistory;
+        });
       }
     } catch (error) {
       console.error('Error removing from history:', error);
@@ -183,14 +197,26 @@ function History() {
   }
 
   const handleToggleFavorite = async (id: string) => {
+    console.log('Starting toggle favorite for id:', id);
     try {
       const success = await window.electronAPI.toggleFavorite(id);
+      console.log('toggleFavorite result:', success);
+      
       if (success) {
-        setClipboardHistory(prev => 
-          prev.map(item => 
+        console.log('Updating states after successful toggle');
+        setClipboardHistory(prev => {
+          console.log('Previous history length:', prev.length);
+          const newHistory = prev.map(item => 
             item.id === id ? { ...item, favorite: !item.favorite } : item
-          )
-        );
+          );
+          // 更新过滤后的历史记录
+          const filtered = filterHistory(newHistory, searchQuery, category);
+          setFilteredHistory(filtered);
+          // 更新显示的历史记录
+          setDisplayedHistory(filtered.slice(0, ITEMS_PER_PAGE));
+          setHasMore(filtered.length > ITEMS_PER_PAGE);
+          return newHistory;
+        });
       }
     } catch (error) {
       console.error('Error toggling favorite:', error);
