@@ -15,12 +15,13 @@ A Modern Cross-Platform Clipboard Manager
 
 ## ✨ Features
 
-- 🔄 **Smart Clipboard History**: Automatically saves and manages clipboard history, supporting text, images, and files
-- 🎯 **Quick Search**: Powerful search functionality for fast history lookup
-- ⌨️ **Keyboard Shortcuts**: Customizable shortcuts for quick clipboard access
-- 🎨 **Modern Interface**: Beautiful UI based on Mantine UI with light/dark theme support
-- 🔒 **Privacy Protection**: Local storage ensures your data stays secure
-- 🌍 **Cross-Platform**: Supports macOS, Windows, and Linux
+- 🔄 **Smart Clipboard History**: Automatically save and manage clipboard history, supporting text and images
+- 🎯 **Quick Search**: Powerful search functionality for fast history location
+- ⌨️ **Shortcut Support**: Customizable shortcuts for quick access to clipboard history
+- 🎨 **Modern Interface**: Beautiful interface based on Mantine UI
+- 🔒 **Privacy Protection**: Local storage ensures data security
+- 🔄 **Cloud Sync**: Support syncing clipboard history to cloud storage via rclone
+- 🌍 **Cross-platform**: Support for macOS, Windows, and Linux
 
 ## 📦 Installation
 
@@ -55,23 +56,9 @@ pnpm build
 2. **Copy**: Use system copy function as usual (Ctrl+C/Command+C)
 3. **View History**: 
    - Click the tray icon to open main interface
-   - Use keyboard shortcut to open main interface (default: `Alt+Space`)
+   - Use keyboard shortcut to open main interface (default: `Command/Ctrl+Shift+V`)
 4. **Search**: Enter keywords in the search box to quickly find items
 5. **Use Content**: Click on history items or use shortcuts for quick paste
-
-## ⚙️ Configuration
-
-- **General Settings**:
-  - Auto-start with system
-  - Show/hide tray icon
-  - Customize keyboard shortcuts
-- **History Management**:
-  - Set maximum history size
-  - Clear history
-  - Export/Import data
-- **Appearance**:
-  - Toggle dark/light theme
-  - Customize interface layout
 
 ## 🤝 Contributing
 
@@ -80,3 +67,25 @@ Contributions are welcome! Feel free to contribute code, report issues, or sugge
 ## 📄 License
 
 ClipHarbor is licensed under the MIT License.
+
+## 🔄 Cloud Sync Configuration
+
+### Rclone Sync
+ClipHarbor supports backing up your clipboard history to cloud storage using rclone. Here's how to set it up:
+
+1. Install rclone and configure remote storage
+   ```bash
+   # Install rclone
+   brew install rclone  # macOS
+   # Or visit https://rclone.org/install/ for other installation methods
+   
+   # Configure remote storage
+   rclone config
+   ```
+
+2. In ClipHarbor settings:
+   - Open settings window
+   - Enter your rclone config name in the sync settings section
+   - Click save, and your clipboard history will automatically sync to the cloud
+
+For more information about rclone configuration, visit [rclone.org](https://rclone.org/)
