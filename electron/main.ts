@@ -1,7 +1,7 @@
 import { app, BrowserWindow, clipboard, ipcMain, nativeImage, globalShortcut, Tray, Menu, shell, MenuItemConstructorOptions } from 'electron';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
-import { execFile } from 'child_process';
+import { execFile, spawn, ChildProcess } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
 import { ClipboardItem, ClipboardHistory } from '../src/types/clipboard';
@@ -16,7 +16,7 @@ const isMac = process.platform === 'darwin';
 const historyFileName = 'clipboard-history.json';
 const __dirname = path.dirname(__filename);
 
-// 2. 日志相关设置
+// 2. 日志相关设置 - 重新组织顺序
 const getLogPath = () => {
   const userDataPath = app.getPath('userData');
   return app.isPackaged 
@@ -25,7 +25,6 @@ const getLogPath = () => {
 };
 
 const logPath = getLogPath();
-log('Log path:', logPath);  // 添加这行来调试路径
 
 // 确保日志目录存在
 try {
@@ -37,6 +36,7 @@ try {
   console.error('Failed to create log directory:', error);
 }
 
+// 先定义 logFile 变量
 const logFile = path.join(logPath, `app-${new Date().toISOString().split('T')[0]}.log`);
 
 // 创建日志函数
@@ -57,6 +57,9 @@ function log(...args: any[]) {
     console.error('Failed to write to log file:', error);
   }
 }
+
+// 现在可以安全地调用 log 函数
+log('Log path:', logPath);
 
 // 3. 全局变量声明
 let settingWindow: BrowserWindow | null = null;
@@ -336,7 +339,10 @@ function registerStoreHandlers() {
   });
 }
 
-// 注册所有的 IPC 处理程序
+// 添加一个 Map 来存储正在执行的同步进程
+const syncProcesses = new Map<string, ChildProcess>();
+
+// 在 registerIpcHandlers 函数内修改 sync-data 处理程序
 function registerIpcHandlers() {
   // 获取剪贴板历史
   ipcMain.handle('get-clipboard-history', () => {
@@ -421,23 +427,21 @@ function registerIpcHandlers() {
     return localFile;
   });
 
-  // 同步数据到云端
-  ipcMain.handle('sync-data', async (event, rcloneConfig: string) => {
+  // 修改同步数据到云端的处理程序
+  ipcMain.handle('sync-data', async (event, rcloneConfig: string, processId: string) => {
     if (!rcloneConfig) {
       throw new Error('请提供 Rclone 配置');
     }
 
-    // 保存配置
     await store.set('settings.rcloneConfig', rcloneConfig);
     log('Saved Rclone config:', rcloneConfig);
-    const execFileAsync = promisify(execFile);
+    
     const localPath = app.getPath('userData');
     const localFile = path.join(localPath, historyFileName);
 
     try {
       // 确保本地数据文件存在
       if (!fs.existsSync(localFile)) {
-        // 如果文件不存在，创建一个包含空历史记录的文件
         const initialData: ClipboardHistory = {
           clipboardHistory: store.get('clipboardHistory', []) as ClipboardItem[]
         };
@@ -449,33 +453,101 @@ function registerIpcHandlers() {
       try {
         await fs.promises.access(localFile, fs.constants.R_OK);
       } catch (error) {
+        log('sync-data access error:', error);
         throw new Error('无法读取本地数据文件，请检查文件权限');
       }
 
-      // 使用 rclone 复制文件到云端
-      await execFileAsync('rclone', ['copy', localFile, rcloneConfig]);
-      return true;
+      // 构建命令
+      const command = ['copy', localFile, rcloneConfig, '-P', '--progress'];
+      
+      // 创建用于显示的命令字符串，使用引号包裹包含空格的路径
+      const displayCommand = command.map(arg => 
+        arg.includes(' ') ? `"${arg}"` : arg
+      ).join(' ');
+
+      const rcloneProcess = createSyncProcess(
+        command,
+        event,
+        processId,
+        `rclone ${displayCommand}`
+      );
+      
+      syncProcesses.set(processId, rcloneProcess);
+
+      // 返回 Promise
+      return new Promise((resolve, reject) => {
+        rcloneProcess.on('close', (code) => {
+          if (syncProcesses.has(processId)) {  // 检查进程是否还存在
+            syncProcesses.delete(processId);
+            if (code === 0) {
+              event.sender.send('sync-progress', { 
+                processId, 
+                data: '同步完成！'
+              });
+              resolve(true);
+            } else {
+              reject(new Error(`同步失败，退出码: ${code}`));
+            }
+          }
+        });
+
+        rcloneProcess.on('error', (error) => {
+          if (syncProcesses.has(processId)) {  // 检查进程是否还存在
+            syncProcesses.delete(processId);
+            event.sender.send('sync-progress', { 
+              processId, 
+              data: `错误: ${error.message}`
+            });
+            reject(error);
+          }
+        });
+      });
+
     } catch (error: any) {
+      syncProcesses.delete(processId);
       if (error.code === 'ENOENT' && error.path === 'rclone') {
         throw new Error('未安装 rclone，请先安装 rclone 并配置远程存储');
       }
-      
-      // 提供更详细的错误信息
-      const errorMessage = error.message || '未知错误';
-      if (errorMessage.includes('directory not found')) {
-        throw new Error('本地数据文件不存在或无法访问，请确保应用有权限访问该目录');
-      }
-      throw new Error(`同步失败: ${errorMessage}`);
+      throw new Error(`同步失败: ${error.message}`);
     }
   });
 
-  // 从云端同步数据到本地
-  ipcMain.handle('sync-data-from-cloud', async (event, rcloneConfig: string) => {
+  // 修改取消同步的处理程序
+  ipcMain.handle('cancel-sync', async (event, processId: string) => {
+    const process = syncProcesses.get(processId);
+    if (process) {
+      try {
+        // 使用全局的 process.platform 而不是 ChildProcess 的属性
+        if (process.platform === 'win32') {
+          await promisify(execFile)('taskkill', ['/pid', process.pid.toString(), '/f', '/t']);
+        } else {
+          process.kill();
+        }
+        
+        // 发送取消消息，确保只发送一次
+        if (syncProcesses.has(processId)) {
+          event.sender.send('sync-progress', { 
+            processId, 
+            data: '同步操作已取消'
+          });
+          syncProcesses.delete(processId);
+        }
+        
+        return true;
+      } catch (error) {
+        console.error('Error killing process:', error);
+        return false;
+      }
+    }
+    return false;
+  });
+
+  // 修改从云端同步数据到本地的处理程序
+  ipcMain.handle('sync-data-from-cloud', async (event, rcloneConfig: string, processId: string) => {
     if (!rcloneConfig) {
       throw new Error('请提供 Rclone 配置');
     }
 
-    const execFileAsync = promisify(execFile);
     const localPath = app.getPath('userData');
     const localFile = path.join(localPath, historyFileName);
 
@@ -483,25 +555,67 @@ function registerIpcHandlers() {
       // 确保本地目录存在
       await fs.promises.mkdir(path.dirname(localFile), { recursive: true });
 
-      // 使用 rclone 从云端复制文件到本地
-      await execFileAsync('rclone', ['copy', rcloneConfig, localPath]);
+      // 构建命令
+      const command = ['copy', rcloneConfig, localPath, '-P', '--progress'];
       
-      try {
-        // 读取并验证同步的数据
-        const data = await fs.promises.readFile(localFile, 'utf-8');
-        const parsedData = JSON.parse(data);
-        
-        if (Array.isArray(parsedData.clipboardHistory)) {
-          store.set('clipboardHistory', parsedData.clipboardHistory);
-        } else {
-          throw new Error('同步的数据格式无效');
-        }
-      } catch (parseError) {
-        throw new Error('无法解析同步的数据，可能是文件格式错误');
-      }
+      // 创建用于显示的命令字符串，使用引号包裹包含空格的路径
+      const displayCommand = command.map(arg => 
+        arg.includes(' ') ? `"${arg}"` : arg
+      ).join(' ');
+
+      const rcloneProcess = createSyncProcess(
+        command,
+        event,
+        processId,
+        `rclone ${displayCommand}`
+      );
       
-      return true;
+      syncProcesses.set(processId, rcloneProcess);
+
+      // 返回 Promise
+      return new Promise((resolve, reject) => {
+        rcloneProcess.on('close', async (code) => {
+          if (syncProcesses.has(processId)) {  // 检查进程是否还存在
+            syncProcesses.delete(processId);
+            if (code === 0) {
+              try {
+                // 读取并验证同步的数据
+                const data = await fs.promises.readFile(localFile, 'utf-8');
+                const parsedData = JSON.parse(data);
+                
+                if (Array.isArray(parsedData.clipboardHistory)) {
+                  store.set('clipboardHistory', parsedData.clipboardHistory);
+                  event.sender.send('sync-progress', { 
+                    processId, 
+                    data: '同步完成！'
+                  });
+                  resolve(true);
+                } else {
+                  throw new Error('同步的数据格式无效');
+                }
+              } catch (parseError) {
+                reject(new Error('无法解析同步的数据，可能是文件格式错误'));
+              }
+            } else {
+              reject(new Error(`同步失败，退出码: ${code}`));
+            }
+          }
+        });
+
+        rcloneProcess.on('error', (error) => {
+          if (syncProcesses.has(processId)) {  // 检查进程是否还存在
+            syncProcesses.delete(processId);
+            event.sender.send('sync-progress', { 
+              processId, 
+              data: `错误: ${error.message}`
+            });
+            reject(error);
+          }
+        });
+      });
+
     } catch (error: any) {
+      syncProcesses.delete(processId);
       if (error.code === 'ENOENT' && error.path === 'rclone') {
         throw new Error('未安装 rclone，请先安装 rclone 并配置远程存储');
       }
@@ -987,3 +1101,126 @@ ipcMain.handle('open-external', async (_, url) => {
 ipcMain.handle('get-app-version', () => {
   return app.getVersion();
 });
+
+// 修改同步处理程序中的进程管理
+function createSyncProcess(
+  command: string[], 
+  event: Electron.IpcMainInvokeEvent, 
+  processId: string,
+  commandString: string
+) {
+  // 首先发送命令信息
+  event.sender.send('sync-progress', { 
+    processId, 
+    data: `正在执行命令: ${commandString}`
+  });
+
+  try {
+    // 使用引号包裹包含空格的路径
+    const quotedCommand = command.map(arg => 
+      arg.includes(' ') ? `"${arg}"` : arg
+    );
+
+    const rcloneProcess = spawn('rclone', quotedCommand, {
+      shell: true,  // 使用 shell 来处理命令
+      stdio: ['pipe', 'pipe', 'pipe']  // 确保所有输出都被捕获
+    });
+    
+    let isTerminated = false;
+    let errorOutput = '';
+    let stdoutBuffer = '';
+    let stderrBuffer = '';
+
+    // 处理标准输出
+    rcloneProcess.stdout.on('data', (data: Buffer) => {
+      if (!isTerminated) {
+        const output = data.toString();
+        stdoutBuffer += output;
+        
+        // 按行处理输出，添加类型注解
+        const lines = output.split('\n');
+        lines.forEach((line: string) => {
+          if (line.trim()) {
+            event.sender.send('sync-progress', { 
+              processId, 
+              data: line.trim()
+            });
+          }
+        });
+      }
+    });
+
+    // 处理标准错误
+    rcloneProcess.stderr.on('data', (data: Buffer) => {
+      if (!isTerminated) {
+        const output = data.toString();
+        stderrBuffer += output;
+        errorOutput += output;
+
+        // 按行处理错误输出，添加类型注解
+        const lines = output.split('\n');
+        lines.forEach((line: string) => {
+          if (line.trim()) {
+            event.sender.send('sync-progress', { 
+              processId, 
+              data: `错误: ${line.trim()}`
+            });
+          }
+        });
+      }
+    });
+
+    // 处理进程退出
+    rcloneProcess.on('exit', (code, signal) => {
+      isTerminated = true;
+      if (syncProcesses.has(processId)) {
+        syncProcesses.delete(processId);
+
+        // 确保所有缓冲的输出都被处理
+        if (code !== 0) {
+          // 如果有错误输出，显示完整的错误信息
+          if (errorOutput) {
+            event.sender.send('sync-progress', { 
+              processId, 
+              data: `命令执行失败 (退出码: ${code})${signal ? `, 信号: ${signal}` : ''}`
+            });
+          }
+        } else {
+          // 如果成功，显示成功消息
+          event.sender.send('sync-progress', { 
+            processId, 
+            data: '命令执行成功'
+          });
+        }
+      }
+    });
+
+    // 处理进程错误（比如命令不存在）
+    rcloneProcess.on('error', (error) => {
+      if (syncProcesses.has(processId)) {
+        event.sender.send('sync-progress', { 
+          processId, 
+          data: `进程错误: ${error.message}`
+        });
+        syncProcesses.delete(processId);
+      }
+    });
+
+    // 如果进程没有立即退出，发送开始执行的消息
+    if (rcloneProcess.pid) {
+      event.sender.send('sync-progress', { 
+        processId, 
+        data: `进程已启动 (PID: ${rcloneProcess.pid})`
+      });
+    }
+
+    return rcloneProcess;
+  } catch (error) {
+    // 处理进程创建失败的情况
+    event.sender.send('sync-progress', { 
+      processId, 
+      data: `启动进程失败: ${error.message}`
+    });
+    throw error;
+  }
+}

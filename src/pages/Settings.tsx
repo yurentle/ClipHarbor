@@ -1,29 +1,30 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   Tabs,
   Text,
-  Switch,
   Stack,
   TextInput,
   NumberInput,
   Button,
   Group,
   useMantineTheme,
-  Select
+  Select,
+  Code,
+  Loader
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { 
-  Settings as SettingsIcon, 
+import {
   Keyboard, 
   InfoCircle,
   BrandGithub,
-  Mail,
   History,
   Database,
   CloudUpload,
-  Download
+  Download,
+  X
 } from 'tabler-icons-react';
 import { Period } from '../types/clipboard';
+import { v4 as uuidv4 } from 'uuid';
 
 const Settings = () => {
   const theme = useMantineTheme();
@@ -38,6 +39,8 @@ const Settings = () => {
   const [syncingLocal, setSyncingLocal] = useState(false);
   const [historyFilePath, setHistoryFilePath] = useState('');
   const [version, setVersion] = useState('0.0.0');
+  const [currentCommand, setCurrentCommand] = useState('');
+  const currentProcessId = useRef<string>('');
 
   useEffect(() => {
     const init = async () => {
@@ -100,6 +103,31 @@ const Settings = () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
+
+  // 监听同步进度
+  useEffect(() => {
+    const handleProgress = (_: any, { processId, data }: { processId: string; data: string }) => {
+      console.log('同步进度:', processId, data);
+      if (processId === currentProcessId.current) {
+        setCurrentCommand(prev => {
+          // 如果是新的命令执行，清空之前的输出
+          if (data.startsWith('正在执行命令:')) {
+            return data;
+          }
+          // 否则追加新的输出
+          return prev ? `${prev}\n${data}` : data;
+        });
+      }
+    };
+
+    // 添加事件监听器
+    window.electronAPI.ipcRenderer.on('sync-progress', handleProgress);
+
+    // 清理函数
+    return () => {
+      window.electronAPI.ipcRenderer.removeListener('sync-progress', handleProgress);
+    };
+  }, []); // 空依赖数组，确保只在组件挂载时添加一次监听器
 
   const getTabStyle = (tabValue: string) => ({
     width: '100%',
@@ -173,7 +201,20 @@ const Settings = () => {
     }
   };
 
+  // 添加一个函数来检查是否有同步任务在执行
+  const isSyncing = syncing || syncingLocal;
+
   const handleSyncToCloud = async () => {
+    // 如果已经有同步任务在执行，直接返回
+    if (isSyncing) {
+      notifications.show({
+        title: '操作失败',
+        message: '已有同步任务在执行中',
+        color: 'red'
+      });
+      return;
+    }
+
     if (!rcloneConfig) {
       notifications.show({
         title: '同步失败',
@@ -183,26 +224,47 @@ const Settings = () => {
       return;
     }
 
-    setSyncing(true);
     try {
-      await window.electronAPI.syncData(rcloneConfig);
+      // 如果已经在同步中，先取消之前的同步
+      if (currentProcessId.current) {
+        await window.electronAPI.cancelSync(currentProcessId.current);
+        // 等待一小段时间确保之前的进程被清理
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
+      setSyncing(true);
+      setCurrentCommand(''); // 清空之前的命令输出
+      const processId = uuidv4();
+      currentProcessId.current = processId;
+      await window.electronAPI.syncData(rcloneConfig, processId);
       notifications.show({
         title: '同步成功',
         message: '数据已成功同步到云端',
-        color: 'green'
+        color: 'green',
       });
     } catch (error: any) {
       notifications.show({
-        title: '同步失败111',
-        message: error.message || '同步数据时发生错误',
-        color: 'red'
+        title: '同步失败',
+        message: error.message,
+        color: 'red',
       });
     } finally {
       setSyncing(false);
+      currentProcessId.current = '';
     }
   };
 
   const handleSyncToLocal = async () => {
+    // 如果已经有同步任务在执行，直接返回
+    if (isSyncing) {
+      notifications.show({
+        title: '操作失败',
+        message: '已有同步任务在执行中',
+        color: 'red'
+      });
+      return;
+    }
+
     if (!rcloneConfig) {
       notifications.show({
         title: '同步失败',
@@ -212,9 +274,17 @@ const Settings = () => {
       return;
     }
 
-    setSyncingLocal(true);
     try {
-      await window.electronAPI.syncDataFromCloud(rcloneConfig);
+      // 如果已经在同步中，先取消之前的同步
+      if (currentProcessId.current) {
+        await window.electronAPI.cancelSync(currentProcessId.current);
+      }
+
+      setSyncingLocal(true);
+      setCurrentCommand(''); // 清空之前的命令输出
+      const processId = uuidv4();
+      currentProcessId.current = processId;
+      await window.electronAPI.syncDataFromCloud(rcloneConfig, processId);
       notifications.show({
         title: '同步成功',
         message: '云端数据已成功同步到本地',
@@ -228,6 +298,20 @@ const Settings = () => {
       });
     } finally {
       setSyncingLocal(false);
+      currentProcessId.current = '';
+    }
+  };
+
+  const handleCancelSync = async () => {
+    if (currentProcessId.current) {
+      try {
+        await window.electronAPI.cancelSync(currentProcessId.current);
+        // 不再在这里添加取消消息，因为主进程会发送取消消息
+      } finally {
+        setSyncing(false);
+        setSyncingLocal(false);
+        currentProcessId.current = '';
+      }
     }
   };
 
@@ -374,21 +458,41 @@ const Settings = () => {
               onChange={(e) => setRcloneConfig(e.target.value)}
             />
             <Group>
+              {currentCommand && (
+                <Code block style={{ 
+                  maxHeight: '200px', 
+                  overflowY: 'auto',
+                  whiteSpace: 'pre-wrap',
+                  width: '100%'
+                }}>
+                  {currentCommand}
+                </Code>
+              )}
               <Button
-                leftSection={<CloudUpload size={16} />}
-                onClick={handleSyncToCloud}
-                loading={syncing}
+                leftSection={syncing ? (
+                  <Loader size="xs" color="red" type="dots" />
+                ) : (
+                  <CloudUpload size={16} />
+                )}
+                onClick={syncing ? handleCancelSync : handleSyncToCloud}
                 variant="light"
+                color={syncing ? 'red' : 'blue'}
+                disabled={!syncing && syncingLocal}
               >
-                {syncing ? '同步中...' : '同步到云端'}
+                {syncing ? '取消同步' : '同步到云端'}
               </Button>
               <Button
-                leftSection={<Download size={16} />}
-                onClick={handleSyncToLocal}
-                loading={syncingLocal}
+                leftSection={syncingLocal ? (
+                  <Loader size="xs" color="red" type="dots" />
+                ) : (
+                  <Download size={16} />
+                )}
+                onClick={syncingLocal ? handleCancelSync : handleSyncToLocal}
                 variant="light"
+                color={syncingLocal ? 'red' : 'blue'}
+                disabled={!syncingLocal && syncing}
               >
-                {syncingLocal ? '同步中...' : '同步到本地'}
+                {syncingLocal ? '取消同步' : '同步到本地'}
               </Button>
             </Group>
             <Text size="xs" color="dimmed">
@@ -409,7 +513,7 @@ const Settings = () => {
             <Text fw={500}>关于应用</Text>
             <Text>版本：{version}</Text>
             <Text c="dimmed">
-              这是一个便捷的剪贴板历史记录管理工具，支持文本、图片和文件的复制记录，
+              这是一个便捷的剪贴板历史记录管理工具，支持文本、图片的复制记录，
               并提供快速检索和收藏功能。
               支持 rclone 同步到云端和从云端同步到本地。
             </Text>
@@ -418,8 +522,6 @@ const Settings = () => {
               <Button 
                 variant="light" 
                 leftSection={<BrandGithub size={16} />}
-                component="a"
-                href="https://github.com/yurentle/ClipHarbor"
                 onClick={(e) => {
                   e.preventDefault();
                   window.electronAPI.openExternal("https://github.com/yurentle/ClipHarbor");
