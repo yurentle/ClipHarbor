@@ -316,224 +316,223 @@ const Settings = () => {
   };
 
   return (
-    <div style={{ height: '100vh', padding: '10px' }}>
-      <Tabs 
-        value={activeTab} 
-        onChange={(value) => setActiveTab(value || 'shortcuts')}
-        orientation="vertical"
-        style={{
-          flex: 1, 
-          display: 'flex', 
-          overflow: 'hidden' 
+    <Tabs 
+      value={activeTab} 
+      onChange={(value) => setActiveTab(value || 'shortcuts')}
+      orientation="vertical"
+      style={{
+        flex: 1, 
+        display: 'flex', 
+        overflow: 'hidden' 
+      }}
+    >
+      <Tabs.List 
+        style={{ 
+          width: '130px', 
+          borderRight: `1px solid ${theme.colors.gray[3]}`,
+          padding: '8px 0 0 8px'
         }}
       >
-        <Tabs.List 
-          style={{ 
-            width: '120px', 
-            borderRight: `1px solid ${theme.colors.gray[3]}`,
-            padding: '8px 0'
-          }}
-        >
-          <Tabs.Tab 
-            value="shortcuts" 
-            leftSection={<Keyboard size={20} />}
-            styles={{ tab: getTabStyle('shortcuts') }}
-          >
-            快捷键
-          </Tabs.Tab>
-          <Tabs.Tab 
-            value="history" 
-            leftSection={<History size={20} />}
-            styles={{ tab: getTabStyle('history') }}
-          >
-            历史记录
-          </Tabs.Tab>
-          <Tabs.Tab 
-            value="storage" 
-            leftSection={<Database size={20} />}
-            styles={{ tab: getTabStyle('storage') }}
-          >
-            数据存储
-          </Tabs.Tab>
-          <Tabs.Tab 
-            value="about" 
-            leftSection={<InfoCircle size={20} />}
-            styles={{ tab: getTabStyle('about') }}
-          >
-            关于
-          </Tabs.Tab>
-        </Tabs.List>
-
-        <Tabs.Panel 
+        <Tabs.Tab 
           value="shortcuts" 
-          style={{ 
-            flex: 1, 
-            overflowY: 'auto', 
-            padding: '16px' 
-          }}
+          leftSection={<Keyboard size={20} />}
+          styles={{ tab: getTabStyle('shortcuts') }}
         >
-          <Stack>
-            <Text fw={500}>快捷键设置</Text>
-            <TextInput
-              label=""
-              placeholder={isInputFocused ? '请按下快捷键组合...' : '点击此处设置快捷键'}
-              value={shortcut}
-              error={shortcutError}
-              onFocus={() => setIsInputFocused(true)}
-              onBlur={handleBlur}
-              onKeyDown={handleKeyDown}
-              onKeyUp={handleKeyUp}
-              readOnly
-              style={{ maxWidth: '400px' }}
-            />
-          </Stack>
-        </Tabs.Panel>
-
-        <Tabs.Panel 
+          快捷键
+        </Tabs.Tab>
+        <Tabs.Tab 
           value="history" 
-          style={{ 
-            flex: 1, 
-            overflowY: 'auto', 
-            padding: '16px' 
-          }}
+          leftSection={<History size={20} />}
+          styles={{ tab: getTabStyle('history') }}
         >
-          <Stack>
-            <Text fw={500}>保留时长设置</Text>
-            <Group>
-              {retentionUnit !== 'permanent' && (
-                <NumberInput
-                  style={{ width: 100 }}
-                  value={retentionPeriod}
-                  allowNegative={false}
-                  allowDecimal={false}
-                  onChange={(value) => handleRetentionChange(value as number, retentionUnit)}
-                  min={0}
-                />
-              )}
-              <Select
-                style={{ width: 120 }}
-                value={retentionUnit}
-                onChange={(value) => {
-                  handleRetentionChange(value === 'permanent' ? 0 : retentionPeriod, value as Period);
-                }}
-                data={[
-                  { value: 'days', label: '天' },
-                  { value: 'months', label: '月' },
-                  { value: 'years', label: '年' },
-                  { value: 'permanent', label: '永久' }
-                ]}
-              />
-            </Group>
-            <Text size="xs" color="dimmed">
-              设置为0或选择永久将永久保存历史记录
-            </Text>
-          </Stack>
-        </Tabs.Panel>
-
-        <Tabs.Panel 
+          历史记录
+        </Tabs.Tab>
+        <Tabs.Tab 
           value="storage" 
-          style={{ 
-            flex: 1, 
-            overflowY: 'auto', 
-            padding: '16px' 
-          }}
+          leftSection={<Database size={20} />}
+          styles={{ tab: getTabStyle('storage') }}
         >
-          <Stack>
-            <Text fw={500}>数据存储设置</Text>
-            <Group>
-              <Text size="sm">本地数据存储位置</Text>
-              <Button 
-                variant="subtle" 
-                size="xs" 
-                onClick={() => window.electronAPI.openStoreDirectory()}
-              >
-                .../
-                {historyFilePath.split('/').slice(-2).join('/')}
-              </Button>
-            </Group>
-            <Text fw={500}>Rclone 配置</Text>
-            <TextInput
-              placeholder="请输入 rclone 配置，例如：remote:history"
-              value={rcloneConfig}
-              onChange={(e) => setRcloneConfig(e.target.value)}
-            />
-            <Group>
-              {currentCommand && (
-                <Code block style={{ 
-                  maxHeight: '200px', 
-                  overflowY: 'auto',
-                  whiteSpace: 'pre-wrap',
-                  width: '100%'
-                }}>
-                  {currentCommand}
-                </Code>
-              )}
-              <Button
-                leftSection={syncing ? (
-                  <Loader size="xs" color="red" type="dots" />
-                ) : (
-                  <CloudUpload size={16} />
-                )}
-                onClick={syncing ? handleCancelSync : handleSyncToCloud}
-                variant="light"
-                color={syncing ? 'red' : 'blue'}
-                disabled={!syncing && syncingLocal}
-              >
-                {syncing ? '取消同步' : '同步到云端'}
-              </Button>
-              <Button
-                leftSection={syncingLocal ? (
-                  <Loader size="xs" color="red" type="dots" />
-                ) : (
-                  <Download size={16} />
-                )}
-                onClick={syncingLocal ? handleCancelSync : handleSyncToLocal}
-                variant="light"
-                color={syncingLocal ? 'red' : 'blue'}
-                disabled={!syncingLocal && syncing}
-              >
-                {syncingLocal ? '取消同步' : '同步到本地'}
-              </Button>
-            </Group>
-            <Text size="xs" color="dimmed">
-              使用 rclone 同步剪贴板历史到云存储或从云存储同步到本地。请确保已安装 rclone 并正确配置了远程存储。
-            </Text>
-          </Stack>
-        </Tabs.Panel>
-
-        <Tabs.Panel 
+          数据存储
+        </Tabs.Tab>
+        <Tabs.Tab 
           value="about" 
-          style={{ 
-            flex: 1, 
-            overflowY: 'auto', 
-            padding: '16px' 
-          }}
+          leftSection={<InfoCircle size={20} />}
+          styles={{ tab: getTabStyle('about') }}
         >
-          <Stack>
-            <Text fw={500}>关于应用</Text>
-            <Text>版本：{version}</Text>
-            <Text c="dimmed">
-              这是一个便捷的剪贴板历史记录管理工具，支持文本、图片的复制记录，
-              并提供快速检索和收藏功能。
-              支持 rclone 同步到云端和从云端同步到本地。
-            </Text>
-            
-            <Group mt="md">
-              <Button 
-                variant="light" 
-                leftSection={<BrandGithub size={16} />}
-                onClick={(e) => {
-                  e.preventDefault();
-                  window.electronAPI.openExternal("https://github.com/yurentle/ClipHarbor");
-                }}
-              >
-                GitHub
-              </Button>
-            </Group>
-          </Stack>
-        </Tabs.Panel>
-      </Tabs>
-    </div>
+          关于
+        </Tabs.Tab>
+      </Tabs.List>
+
+      <Tabs.Panel 
+        value="shortcuts" 
+        style={{ 
+          flex: 1, 
+          overflowY: 'auto', 
+          padding: '16px' 
+        }}
+      >
+        <Stack>
+          <Text fw={500}>快捷键设置</Text>
+          <TextInput
+            label=""
+            placeholder={isInputFocused ? '请按下快捷键组合...' : '点击此处设置快捷键'}
+            value={shortcut}
+            error={shortcutError}
+            onFocus={() => setIsInputFocused(true)}
+            onBlur={handleBlur}
+            onKeyDown={handleKeyDown}
+            onKeyUp={handleKeyUp}
+            readOnly
+            style={{ maxWidth: '400px' }}
+          />
+        </Stack>
+      </Tabs.Panel>
+
+      <Tabs.Panel 
+        value="history" 
+        style={{ 
+          flex: 1, 
+          overflowY: 'auto', 
+          padding: '16px' 
+        }}
+      >
+        <Stack>
+          <Text fw={500}>保留时长设置</Text>
+          <Group>
+            {retentionUnit !== 'permanent' && (
+              <NumberInput
+                style={{ width: 100 }}
+                value={retentionPeriod}
+                allowNegative={false}
+                allowDecimal={false}
+                onChange={(value) => handleRetentionChange(value as number, retentionUnit)}
+                min={0}
+              />
+            )}
+            <Select
+              style={{ width: 120 }}
+              value={retentionUnit}
+              onChange={(value) => {
+                handleRetentionChange(value === 'permanent' ? 0 : retentionPeriod, value as Period);
+              }}
+              data={[
+                { value: 'days', label: '天' },
+                { value: 'months', label: '月' },
+                { value: 'years', label: '年' },
+                { value: 'permanent', label: '永久' }
+              ]}
+            />
+          </Group>
+          <Text size="xs" color="dimmed">
+            设置为0或选择永久将永久保存历史记录
+          </Text>
+        </Stack>
+      </Tabs.Panel>
+
+      <Tabs.Panel 
+        value="storage" 
+        style={{ 
+          flex: 1,
+          height: '100vh',
+          overflowY: 'auto', 
+          padding: '16px' 
+        }}
+      >
+        <Stack>
+          <Text fw={500}>数据存储设置</Text>
+          <Group>
+            <Text size="sm">本地数据存储位置</Text>
+            <Button 
+              variant="subtle" 
+              size="xs" 
+              onClick={() => window.electronAPI.openStoreDirectory()}
+            >
+              .../
+              {historyFilePath.split('/').slice(-2).join('/')}
+            </Button>
+          </Group>
+          <Text fw={500}>Rclone 配置</Text>
+          <TextInput
+            placeholder="请输入 rclone 配置，例如：remote:history"
+            value={rcloneConfig}
+            onChange={(e) => setRcloneConfig(e.target.value)}
+          />
+          <Group>
+            {currentCommand && (
+              <Code block style={{ 
+                maxHeight: '200px', 
+                overflowY: 'auto',
+                whiteSpace: 'pre-wrap',
+                width: '100%'
+              }}>
+                {currentCommand}
+              </Code>
+            )}
+            <Button
+              leftSection={syncing ? (
+                <Loader size="xs" color="red" type="dots" />
+              ) : (
+                <CloudUpload size={16} />
+              )}
+              onClick={syncing ? handleCancelSync : handleSyncToCloud}
+              variant="light"
+              color={syncing ? 'red' : 'blue'}
+              disabled={!syncing && syncingLocal}
+            >
+              {syncing ? '取消同步' : '同步到云端'}
+            </Button>
+            <Button
+              leftSection={syncingLocal ? (
+                <Loader size="xs" color="red" type="dots" />
+              ) : (
+                <Download size={16} />
+              )}
+              onClick={syncingLocal ? handleCancelSync : handleSyncToLocal}
+              variant="light"
+              color={syncingLocal ? 'red' : 'blue'}
+              disabled={!syncingLocal && syncing}
+            >
+              {syncingLocal ? '取消同步' : '同步到本地'}
+            </Button>
+          </Group>
+          <Text size="xs" color="dimmed">
+            使用 rclone 同步剪贴板历史到云存储或从云存储同步到本地。请确保已安装 rclone 并正确配置了远程存储。
+          </Text>
+        </Stack>
+      </Tabs.Panel>
+
+      <Tabs.Panel 
+        value="about" 
+        style={{ 
+          flex: 1, 
+          overflowY: 'auto', 
+          padding: '16px' 
+        }}
+      >
+        <Stack>
+          <Text fw={500}>关于应用</Text>
+          <Text>版本：{version}</Text>
+          <Text c="dimmed">
+            这是一个便捷的剪贴板历史记录管理工具，支持文本、图片的复制记录，
+            并提供快速检索和收藏功能。
+            支持 rclone 同步到云端和从云端同步到本地。
+          </Text>
+          
+          <Group mt="md">
+            <Button 
+              variant="light" 
+              leftSection={<BrandGithub size={16} />}
+              onClick={(e) => {
+                e.preventDefault();
+                window.electronAPI.openExternal("https://github.com/yurentle/ClipHarbor");
+              }}
+            >
+              GitHub
+            </Button>
+          </Group>
+        </Stack>
+      </Tabs.Panel>
+    </Tabs>
   );
 };
 
