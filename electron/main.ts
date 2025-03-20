@@ -864,6 +864,31 @@ function createTrayIcon(): Tray {
   return tray;
 }
 
+// 创建 Dock 图标
+function createDockIcon() {
+  if (isMac) {
+    try {
+      const dockIconPath = app.isPackaged
+        ? path.join(process.resourcesPath, 'icons/logo_dock.png')
+        : path.join(__dirname, '../public/icons/logo_dock.png');
+      
+      log('Setting dock icon:', dockIconPath);
+      app.dock.setIcon(dockIconPath);
+      // app.dock.setMenu(Menu.buildFromTemplate([
+      //   {
+      //     label: '退出',
+      //     click: () => {
+      //       isQuitting = true;
+      //       app.quit();
+      //     }
+      //   }
+      // ]));
+    } catch (dockError) {
+      log('Error setting dock icon:', dockError);
+    }
+  }
+}
+
 // 创建托盘菜单
 function createContextMenu(): Menu {
   const template: MenuItemConstructorOptions[] = [
@@ -979,32 +1004,16 @@ app.whenReady().then(async () => {
     // 注册 IPC 处理程序
     registerIpcHandlers();
 
+    // 创建 Dock 图标
+    // createDockIcon();
+
+    // 隐藏dock图标
+    app.dock.hide();
+
     // 立即创建并显示设置窗口
     log('Creating settings window...');
     await createSettingWindow();
-
-    if (isMac) {
-      try {
-        const dockIconPath = app.isPackaged
-          ? path.join(process.resourcesPath, 'icons/logo_dock.png')
-          : path.join(__dirname, '../public/icons/logo_dock.png');
-        
-        log('Setting dock icon:', dockIconPath);
-        app.dock.setIcon(dockIconPath);
-        app.dock.setMenu(Menu.buildFromTemplate([
-          {
-            label: '退出',
-            click: () => {
-              isQuitting = true;
-              app.quit();
-            }
-          }
-        ]));
-      } catch (dockError) {
-        log('Error setting dock icon:', dockError);
-      }
-    }
-
+    
     try {
       // 创建托盘图标
       log('Creating tray icon...');
