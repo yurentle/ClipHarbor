@@ -514,17 +514,15 @@ function registerIpcHandlers() {
 
   // 修改取消同步的处理程序
   ipcMain.handle('cancel-sync', async (event, processId: string) => {
-    const process = syncProcesses.get(processId);
-    if (process) {
+    const childProcess = syncProcesses.get(processId);
+    if (childProcess) {
       try {
-        // 使用全局的 process.platform 而不是 ChildProcess 的属性
-        if (process.platform === 'win32') {
-          await promisify(execFile)('taskkill', ['/pid', process.pid.toString(), '/f', '/t']);
+        if (process.platform === 'win32') {  // 使用全局的 process.platform
+          await promisify(execFile)('taskkill', ['/pid', childProcess.pid.toString(), '/f', '/t']);
         } else {
-          process.kill();
+          childProcess.kill();
         }
         
-        // 发送取消消息，确保只发送一次
         if (syncProcesses.has(processId)) {
           event.sender.send('sync-progress', { 
             processId, 
@@ -532,7 +530,6 @@ function registerIpcHandlers() {
           });
           syncProcesses.delete(processId);
         }
-        
         return true;
       } catch (error) {
         console.error('Error killing process:', error);
