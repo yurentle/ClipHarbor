@@ -50,5 +50,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     removeListener: (channel: string, func: (...args: any[]) => void) => {
       ipcRenderer.removeListener(channel, func);
     },
-  }
+  },
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
 } as ElectronAPI)

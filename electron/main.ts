@@ -6,6 +6,7 @@ import { promisify } from 'util';
 import fs from 'fs';
 import { ClipboardItem, ClipboardHistory } from '../src/types/clipboard';
 import { EventEmitter } from 'events';
+import { Octokit } from '@octokit/rest';
 
 declare global {
   var clipboardInterval: NodeJS.Timeout | undefined;
@@ -1229,4 +1230,75 @@ function createSyncProcess(
     });
     throw error;
   }
+}
+
+// 添加检查更新的处理程序
+ipcMain.handle('check-for-updates', async () => {
+  try {
+    log('Checking for updates...');
+    const octokit = new Octokit();
+    const owner = 'yurentle';  // 替换为你的 GitHub 用户名
+    const repo = 'ClipHarbor';  // 替换为你的仓库名
+
+    // 获取最新的 release
+    const { data: latestRelease } = await octokit.repos.getLatestRelease({
+      owner,
+      repo
+    });
+
+    log('Latest release:', latestRelease);
+
+    const currentVersion = app.getVersion();
+    const latestVersion = latestRelease.tag_name.replace('v', '');
+
+    // 比较版本号
+    const hasUpdate = compareVersions(latestVersion, currentVersion) > 0;
+
+    log('hasUpdate:', hasUpdate);
+
+    if (hasUpdate) {
+      // 找到对应平台的下载链接
+      const platform = process.platform;
+      const arch = process.arch;
+      const assetPattern = new RegExp(`ClipHarbor.*${platform}.*${arch}`);
+      const downloadAsset = latestRelease.assets.find(asset => 
+        assetPattern.test(asset.name)
+      );
+
+      if (downloadAsset) {
+        // 如果有更新，打开下载页面
+        shell.openExternal(downloadAsset.browser_download_url);
+      }
+
+      return {
+        hasUpdate: true,
+        version: latestVersion,
+        releaseNotes: latestRelease.body,
+        downloadUrl: downloadAsset?.browser_download_url
+      };
+    }
+
+    return {
+      hasUpdate: false,
+      version: currentVersion
+    };
+
+  } catch (error: any) {
+    log('Error checking for updates:', error);
+    throw new Error('检查更新失败: ' + error.message);
+  }
+});
+
+// 添加版本比较函数
+function compareVersions(v1: string, v2: string): number {
+  const parts1 = v1.split('.').map(Number);
+  const parts2 = v2.split('.').map(Number);
+  
+  for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+    const part1 = parts1[i] || 0;
+    const part2 = parts2[i] || 0;
+    if (part1 > part2) return 1;
+    if (part1 < part2) return -1;
+  }
+  return 0;
 }

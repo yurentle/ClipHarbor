@@ -21,7 +21,8 @@ import {
   Database,
   CloudUpload,
   Download,
-  X
+  X,
+  Refresh
 } from 'tabler-icons-react';
 import { Period } from '../types/clipboard';
 import { v4 as uuidv4 } from 'uuid';
@@ -41,6 +42,7 @@ const Settings = () => {
   const [version, setVersion] = useState('0.0.0');
   const [currentCommand, setCurrentCommand] = useState('');
   const currentProcessId = useRef<string>('');
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
 
   useEffect(() => {
     const init = async () => {
@@ -315,6 +317,28 @@ const Settings = () => {
     }
   };
 
+  const handleCheckUpdate = async () => {
+    try {
+      setCheckingUpdate(true);
+      const result = await window.electronAPI.checkForUpdates();
+      if (!result.hasUpdate) {
+        notifications.show({
+          title: '检查更新',
+          message: '当前已是最新版本',
+          color: 'green'
+        });
+      }
+    } catch (error: any) {
+      notifications.show({
+        title: '检查更新失败',
+        message: error.message,
+        color: 'red'
+      });
+    } finally {
+      setCheckingUpdate(false);
+    }
+  };
+
   return (
     <Tabs 
       value={activeTab} 
@@ -511,7 +535,18 @@ const Settings = () => {
       >
         <Stack>
           <Text fw={500}>关于应用</Text>
-          <Text>版本：{version}</Text>
+          <Group>
+            <Text>版本：{version}</Text>
+            <Button
+              variant="light"
+              size="xs"
+              leftSection={<Refresh size={16} />}
+              onClick={handleCheckUpdate}
+              loading={checkingUpdate}
+            >
+              检查更新
+            </Button>
+          </Group>
           <Text c="dimmed">
             这是一个便捷的剪贴板历史记录管理工具，支持文本、图片的复制记录，
             并提供快速检索和收藏功能。

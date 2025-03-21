@@ -1,5 +1,12 @@
 import { ClipboardItem } from './clipboard'
 
+export interface UpdateInfo {
+  hasUpdate: boolean;
+  version?: string;
+  releaseNotes?: string;
+  downloadUrl?: string;
+}
+
 export interface ElectronAPI {
   onClipboardChange: (callback: (newItem: ClipboardItem) => void) => () => void
   getClipboardHistory: () => Promise<ClipboardItem[]>
@@ -24,4 +31,5 @@ export interface ElectronAPI {
     on: (channel: string, func: (...args: any[]) => void) => void
     removeListener: (channel: string, func: (...args: any[]) => void) => void
   }
+  checkForUpdates: () => Promise<UpdateInfo>
 }
