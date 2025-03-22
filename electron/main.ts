@@ -401,10 +401,8 @@ function registerIpcHandlers() {
   ipcMain.handle('get-store-value', (_, key: string) => {
     try {
       const value = store.get(`settings.${key}`);
-      log(`Getting store value for ${key}:`, value);
       return value;
     } catch (error) {
-      log(`Error getting store value for ${key}:`, error);
       return undefined;
     }
   });
@@ -413,7 +411,6 @@ function registerIpcHandlers() {
   ipcMain.handle('set-store-value', (_, key: string, value: any) => {
     try {
       store.set(`settings.${key}`, value);
-      log(`Setting store value for ${key}:`, value);
       return true;
     } catch (error) {
       log(`Error setting store value for ${key}:`, error);
@@ -629,7 +626,6 @@ function registerIpcHandlers() {
 
   // 添加打开设置窗口的处理程序
   ipcMain.handle('open-settings-window', async () => {
-    log('======open settings window=======');
     try {
       await createSettingWindow();
       return true;
@@ -832,7 +828,6 @@ async function createHistoryWindow() {
 
 // 创建托盘图标
 function createTrayIcon(): Tray {
-  log('createTrayIcon');
   let iconPath: string;
   
   if (app.isPackaged) {
@@ -842,11 +837,6 @@ function createTrayIcon(): Tray {
     // 在开发环境中使用项目目录
     iconPath = path.join(__dirname, '../public/icons/logo_tray_Template@2x.png');
   }
-
-  log('App path:', app.getAppPath());
-  log('Is packaged:', app.isPackaged);
-  log('Resource path:', process.resourcesPath);
-  log('Tray icon path:', iconPath);
 
   const icon = nativeImage.createFromPath(iconPath);
   if (icon.isEmpty()) {
@@ -909,43 +899,14 @@ function createContextMenu(): Menu {
 
 // 开始监听剪贴板变化
 function startClipboardMonitoring() {
-  console.log('Starting clipboard monitoring...');
   let lastContent = '';
   let lastImage = '';
 
   // 每秒检查一次剪贴板变化
   global.clipboardInterval = setInterval(() => {
     try {
-      // 检查是否有文件
-      // const filePaths = clipboard.readBuffer('FileNameW');
-      // console.log('filePaths', filePaths.length);
-      // if (filePaths.length > 0) {
-      //   console.log('filePaths.has.length');
-      //   try {
-      //     const files = clipboard.readBuffer('FileNameW').toString('ucs2').replace(/\\/g, '/').split('\0').filter(Boolean);
-      //     if (files.length > 0 && files.join(',') !== lastContent) {
-      //       lastContent = files.join(',');
-      //       const history = store.get('clipboardHistory', []) as ClipboardItem[];
-      //       const newItem: ClipboardItem = {
-      //         id: uuidv4(),
-      //         content: files.join(','),
-      //         type: 'text',
-      //         timestamp: Date.now(),
-      //         favorite: false
-      //       }
-      //       const newHistory = [newItem, ...history.filter(item => item.content !== newItem.content)];
-      //       store.set('clipboardHistory', newHistory);
-      //       broadcastClipboardChange(newItem);
-      //     }
-      //   } catch (error) {
-      //     console.error('Error processing file paths:', error);
-      //   }
-      //   return;
-      // }
-
       // 检查是否有图片
       const image = clipboard.readImage();
-      // console.log(new Date().toISOString(), 'image.isEmpty()', image.isEmpty());
       if (!image.isEmpty()) {
         const dataUrl = image.toDataURL();
         if (dataUrl !== lastImage) {
@@ -967,9 +928,7 @@ function startClipboardMonitoring() {
       } else {
         // 检查文本内容
         const text = clipboard.readText();
-        // console.log(new Date().toISOString(), 'text.content', text);
         if (text && text !== lastContent) {
-          console.log('save text');
           lastContent = text;
           const history = store.get('clipboardHistory', []) as ClipboardItem[];
           const newItem: ClipboardItem = {
@@ -1237,8 +1196,8 @@ ipcMain.handle('check-for-updates', async () => {
   try {
     log('Checking for updates...');
     const octokit = new Octokit();
-    const owner = 'yurentle';  // 替换为你的 GitHub 用户名
-    const repo = 'ClipHarbor';  // 替换为你的仓库名
+    const owner = 'yurentle';
+    const repo = 'ClipHarbor';
 
     // 获取最新的 release
     const { data: latestRelease } = await octokit.repos.getLatestRelease({
