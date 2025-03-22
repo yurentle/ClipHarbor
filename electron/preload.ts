@@ -2,6 +2,13 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { ElectronAPI } from '../src/types/electron'
 import { BrowserWindow } from 'electron'
 
+type UpdateInfo = {
+  hasUpdate: boolean;
+  version?: string;
+  releaseNotes?: string;
+  downloadUrl?: string;
+}
+
 // 使用 contextBridge 暴露 API
 contextBridge.exposeInMainWorld('electronAPI', {
   onClipboardChange: (callback: (content: any) => void) => {
@@ -51,5 +58,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.removeListener(channel, func);
     },
   },
-  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  checkForUpdates: (): Promise<UpdateInfo> => ipcRenderer.invoke('check-for-updates'),
 } as ElectronAPI)

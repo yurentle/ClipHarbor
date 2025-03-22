@@ -21,11 +21,11 @@ import {
   Database,
   CloudUpload,
   Download,
-  X,
   Refresh
 } from 'tabler-icons-react';
 import { Period } from '../types/clipboard';
 import { v4 as uuidv4 } from 'uuid';
+import { modals } from '@mantine/modals';
 
 const Settings = () => {
   const theme = useMantineTheme();
@@ -320,8 +320,40 @@ const Settings = () => {
   const handleCheckUpdate = async () => {
     try {
       setCheckingUpdate(true);
-      const result = await window.electronAPI.checkForUpdates();
-      if (!result.hasUpdate) {
+      const result = await window.electronAPI.checkForUpdates()
+      if (result.hasUpdate) {
+        // 显示更新信息弹窗
+        modals.open({
+          title: '发现新版本',
+          size: 'md',
+          children: (
+            <Stack>
+              <Text size="lg" fw={500}>v{result.version}</Text>
+              <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
+                {result.releaseNotes}
+              </Text>
+              <Group justify="flex-end">
+                <Button
+                  variant="light"
+                  onClick={() => {
+                    window.electronAPI.openExternal(result.downloadUrl!);
+                    modals.closeAll();
+                  }}
+                >
+                  前往下载
+                </Button>
+                <Button
+                  variant="subtle"
+                  color="gray"
+                  onClick={() => modals.closeAll()}
+                >
+                  稍后再说
+                </Button>
+              </Group>
+            </Stack>
+          )
+        });
+      } else {
         notifications.show({
           title: '检查更新',
           message: '当前已是最新版本',
@@ -329,9 +361,10 @@ const Settings = () => {
         });
       }
     } catch (error: any) {
+      console.error('更新检查失败:', error);  // 添加详细的错误日志
       notifications.show({
         title: '检查更新失败',
-        message: error.message,
+        message: error.message || '未知错误',  // 添加默认错误消息
         color: 'red'
       });
     } finally {

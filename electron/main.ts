@@ -1245,9 +1245,6 @@ ipcMain.handle('check-for-updates', async () => {
       owner,
       repo
     });
-
-    log('Latest release:', latestRelease);
-
     const currentVersion = app.getVersion();
     const latestVersion = latestRelease.tag_name.replace('v', '');
 
@@ -1255,26 +1252,12 @@ ipcMain.handle('check-for-updates', async () => {
     const hasUpdate = compareVersions(latestVersion, currentVersion) > 0;
 
     log('hasUpdate:', hasUpdate);
-
     if (hasUpdate) {
-      // 找到对应平台的下载链接
-      const platform = process.platform;
-      const arch = process.arch;
-      const assetPattern = new RegExp(`ClipHarbor.*${platform}.*${arch}`);
-      const downloadAsset = latestRelease.assets.find(asset => 
-        assetPattern.test(asset.name)
-      );
-
-      if (downloadAsset) {
-        // 如果有更新，打开下载页面
-        shell.openExternal(downloadAsset.browser_download_url);
-      }
-
       return {
         hasUpdate: true,
         version: latestVersion,
         releaseNotes: latestRelease.body,
-        downloadUrl: downloadAsset?.browser_download_url
+        downloadUrl: latestRelease.html_url
       };
     }
 
