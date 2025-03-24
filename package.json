@@ -1,7 +1,7 @@
 {
-  "name": "clipharbor",
+  "name": "ClipHarbor",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.4.0",
   "license": "MIT",
   "description": "A modern clipboard manager for macOS, Windows and Linux",
   "author": {
@@ -22,7 +22,7 @@
     "build:linux": "npm run build && electron-builder --linux"
   },
   "build": {
-    "appId": "com.electron.clipharbor",
+    "appId": "com.electron.ClipHarbor",
     "productName": "ClipHarbor",
     "directories": {
       "output": "release",
