@@ -12,9 +12,3 @@ export function compareVersions(v1: string, v2: string): number {
   }
   return 0;
 }
-
-export function getResourcePath(fileName: string): string {
-  return process.env.NODE_ENV === 'development'
-    ? path.join(__dirname, '../../public', fileName)
-    : path.join(process.resourcesPath, fileName);
-} 

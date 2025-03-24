@@ -32,24 +32,37 @@
       "dist/**/*",
       "resources/**/*"
     ],
+    "extraResources": [
+      {
+        "from": "resources",
+        "to": "."
+      }
+    ],
     "mac": {
       "category": "public.app-category.utilities",
       "target": [
         "dmg",
         "zip"
-      ]
+      ],
+      "darkModeSupport": true,
+      "icon": "resources/icons/logo_dock.png"
     },
     "win": {
       "target": [
         "nsis",
         "portable"
-      ]
+      ],
+      "icon": "resources/icons/logo_dock.png"
     },
     "linux": {
       "target": [
         "AppImage",
         "deb"
-      ]
+      ],
+      "icon": "resources/icons",
+      "category": "Utility",
+      "maintainer": "yurentle",
+      "description": "A modern clipboard manager for macOS, Windows and Linux"
     },
     "nsis": {
       "oneClick": false,

@@ -1,6 +1,6 @@
 import { Tray, Menu, nativeImage } from 'electron';
 import path from 'path';
-import { IS_DEV, PATHS } from '../utils/constants';
+import { PATHS } from '../utils/constants';
 import { logger } from '../utils/logger';
 import { SettingsWindow } from '../windows/settingsWindow';
 
@@ -25,13 +25,13 @@ export class TrayManager {
     }
 
     try {
-      const iconPath = IS_DEV
-        ? path.join(process.cwd(), 'resources/icons/logo_tray_Template@2x.png')
-        : path.join(PATHS.resources, 'icons/logo_tray_Template.png');
-
+      // 构建托盘图标路径
+      const iconName = 'logo_tray_Template@2x.png'
+      const iconPath = path.join(PATHS.icons, iconName);
       logger.info('Loading tray icon from:', iconPath);
+
+      // 创建托盘图标
       const icon = nativeImage.createFromPath(iconPath);
-      
       if (icon.isEmpty()) {
         throw new Error(`Failed to load tray icon from path: ${iconPath}`);
       }
@@ -39,7 +39,6 @@ export class TrayManager {
       this.tray = new Tray(icon);
       this.tray.setToolTip('ClipHarbor');
       this.updateContextMenu();
-      
       logger.info('Tray created successfully');
     } catch (error) {
       logger.error('Error creating tray:', error);
