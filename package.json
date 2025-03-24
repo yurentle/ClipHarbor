@@ -1,66 +1,55 @@
 {
-  "name": "ClipHarbor",
+  "name": "clipharbor",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.1.0",
   "license": "MIT",
   "description": "A modern clipboard manager for macOS, Windows and Linux",
   "author": {
     "name": "yurentle",
     "email": "yurentle@gmail.com"
   },
-  "main": "dist-electron/main.js",
+  "main": "dist/main/main.js",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -p tsconfig.electron.json && vite build && electron-builder",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview"
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css,json}\"",
+    "clean": "rimraf dist",
+    "typecheck": "tsc --noEmit",
+    "build:mac": "npm run build && electron-builder --mac",
+    "build:win": "npm run build && electron-builder --win",
+    "build:linux": "npm run build && electron-builder --linux"
   },
   "build": {
-    "appId": "io.github.yurentle.ClipHarbor",
+    "appId": "com.electron.clipharbor",
     "productName": "ClipHarbor",
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "resources"
     },
     "files": [
       "dist/**/*",
-      "dist-electron/**/*",
-      "node_modules/**/*",
-      "electron/preload.js"
-    ],
-    "extraResources": [
-      {
-        "from": "build/icons",
-        "to": "icons",
-        "filter": [
-          "**/*"
-        ]
-      }
+      "resources/**/*"
     ],
     "mac": {
       "category": "public.app-category.utilities",
       "target": [
         "dmg",
         "zip"
-      ],
-      "icon": "public/icons/logo.icns",
-      "darkModeSupport": true
+      ]
     },
     "win": {
       "target": [
         "nsis",
         "portable"
-      ],
-      "icon": "public/icons/logo.ico"
+      ]
     },
     "linux": {
       "target": [
         "AppImage",
         "deb"
-      ],
-      "icon": "public/icons",
-      "category": "Utility",
-      "maintainer": "yurentle <yurentle@gmail.com>",
-      "description": "A modern clipboard manager for macOS, Windows and Linux"
+      ]
     },
     "nsis": {
       "oneClick": false,
@@ -79,12 +68,11 @@
     "@emotion/react": "^11.13.5",
     "@mantine/core": "^7.14.3",
     "@mantine/hooks": "^7.14.3",
-    "@mantine/notifications": "^7.14.3",
     "@mantine/modals": "^7.14.3",
+    "@mantine/notifications": "^7.14.3",
     "@octokit/rest": "^21.1.1",
     "@types/uuid": "^10.0.0",
     "dayjs": "^1.11.13",
-    "electron-store": "^10.0.1",
     "nanoid": "^5.0.9",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -93,6 +81,7 @@
     "uuid": "^11.0.3"
   },
   "devDependencies": {
+    "@electron-toolkit/tsconfig": "^1.0.1",
     "@types/node": "^22.10.1",
     "@types/react": "^18.2.64",
     "@types/react-dom": "^18.2.21",
@@ -101,6 +90,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "electron": "^35.0.1",
     "electron-builder": "^25.1.8",
+    "electron-vite": "^3.0.0",
     "eslint": "^9.22.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.19",

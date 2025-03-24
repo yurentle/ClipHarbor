@@ -23,7 +23,7 @@ import {
   Download,
   Refresh
 } from 'tabler-icons-react';
-import { Period } from '../types/clipboard';
+import { Period } from '@types/clipboard';
 import { v4 as uuidv4 } from 'uuid';
 import { modals } from '@mantine/modals';
 
@@ -32,7 +32,6 @@ const Settings = () => {
   const [activeTab, setActiveTab] = useState<string>('shortcuts');
   const [shortcut, setShortcut] = useState('');
   const [shortcutError, setShortcutError] = useState('');
-  const [isInputFocused, setIsInputFocused] = useState(false);
   const [retentionPeriod, setRetentionPeriod] = useState<number>(30);
   const [retentionUnit, setRetentionUnit] = useState<Period>('days');
   const [rcloneConfig, setRcloneConfig] = useState('');
@@ -43,11 +42,14 @@ const Settings = () => {
   const [currentCommand, setCurrentCommand] = useState('');
   const currentProcessId = useRef<string>('');
   const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [pressedKeys, setPressedKeys] = useState<Set<string>>(new Set());
+  const [isSettingShortcut, setIsSettingShortcut] = useState(false);
 
   useEffect(() => {
     const init = async () => {
       try {
-        const defaultShortcut = await window.electronAPI.getStoreValue('shortcut');
+        const defaultShortcut = await window.electronAPI.store.get('settings.shortcut');
+        console.log('defaultShortcut', defaultShortcut);
         setShortcut(defaultShortcut);
       } catch (error) {
         console.error('Error initializing settings:', error);
@@ -59,8 +61,8 @@ const Settings = () => {
   useEffect(() => {
     const loadRetentionSettings = async () => {
       try {
-        const period = await window.electronAPI.getStoreValue('retentionPeriod');
-        const unit = await window.electronAPI.getStoreValue('retentionUnit');
+        const period = await window.electronAPI.store.get('settings.retentionPeriod');
+        const unit = await window.electronAPI.store.get('settings.retentionUnit');
         if (period !== undefined) setRetentionPeriod(period);
         if (unit !== undefined) setRetentionUnit(unit);
       } catch (error) {
@@ -73,8 +75,8 @@ const Settings = () => {
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const config = await window.electronAPI.getStoreValue('rcloneConfig');
-        const filePath = await window.electronAPI.getHistoryFilePath();
+        const config = await window.electronAPI.store.get('settings.rcloneConfig');
+        const filePath = await window.electronAPI.system.getHistoryFilePath();
         if (config) setRcloneConfig(config);
         if (filePath) setHistoryFilePath(filePath);
       } catch (error) {
@@ -86,7 +88,7 @@ const Settings = () => {
 
   useEffect(() => {
     const getVersion = async () => {
-      const ver = await window.electronAPI.getAppVersion();
+      const ver = await window.electronAPI.system.getAppVersion();
       setVersion(ver);
     };
     getVersion();
@@ -95,7 +97,7 @@ const Settings = () => {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        window.electronAPI.closeSettingsWindow();
+        window.electronAPI.window.closeSettingsWindow();
       }
     };
 
@@ -152,8 +154,16 @@ const Settings = () => {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     e.preventDefault();
     
+    if (!isSettingShortcut) return;
+
     // 记录按下的键
     const key = e.key === ' ' ? 'Space' : e.key;
+    setPressedKeys(prev => {
+      const next = new Set(prev);
+      next.add(key);
+      return next;
+    });
+    
     // 更新显示的快捷键
     const modifiers = [];
     if (e.metaKey) modifiers.push('Command');
@@ -169,35 +179,73 @@ const Settings = () => {
     setShortcut(modifiers.join('+'));
   };
 
-  const handleBlur = async () => {
-    if (shortcut.split('+').length > 1) {
-      try {
-        const success = await window.electronAPI.setStoreValue('shortcut', shortcut);
-        if (!success) {
-          setShortcutError('无效的快捷键组合');
-        } else {
-          setShortcut(shortcut);
-          setShortcutError('');
+  const handleKeyUp = async (e: React.KeyboardEvent) => {
+    console.log('handleKeyUp-isSettingShortcut', isSettingShortcut);
+    if (!isSettingShortcut) return;
+
+    const key = e.key === ' ' ? 'Space' : e.key;
+    setPressedKeys(prev => {
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
+    console.log('pressedKeys', pressedKeys);
+    console.log('shortcut', shortcut);
+    // 当所有按键都松开时，注册快捷键
+    if (pressedKeys.size === 2) {  // 因为当前键还没有从 Set 中删除
+      setIsSettingShortcut(false);
+      
+      if (shortcut.split('+').length > 1) {
+        try {
+          const success = await window.electronAPI.system.registerShortcut(shortcut);
+          if (success) {
+            await window.electronAPI.store.set('settings.shortcut', shortcut);
+            notifications.show({
+              title: '成功',
+              message: '快捷键已更新',
+              color: 'green',
+            });
+          } else {
+            setShortcutError('无效的快捷键组合');
+            notifications.show({
+              title: '错误',
+              message: '无效的快捷键组合',
+              color: 'red',
+            });
+          }
+        } catch (error) {
+          console.error('Error registering shortcut:', error);
+          setShortcutError('注册快捷键失败');
+          notifications.show({
+            title: '错误',
+            message: '注册快捷键失败',
+            color: 'red',
+          });
         }
-      } catch (error) {
-        console.error('Error saving shortcut:', error);
-        setShortcutError('保存快捷键失败');
+      } else {
+        setShortcutError('请至少设置两个按键的组合');
       }
-    } else {
-      setShortcutError('请至少设置两个按键的组合');
     }
   };
 
-  const handleKeyUp = (e: React.KeyboardEvent) => {
-    // 记录松开的键
+  // 修改输入框的焦点处理
+  const handleFocus = () => {
+    setIsSettingShortcut(true);
+    setPressedKeys(new Set());
+    setShortcutError('');
+  };
+
+  const handleBlur = () => {
+    setIsSettingShortcut(false);
+    setPressedKeys(new Set());
   };
 
   const handleRetentionChange = async (value: number, unit: Period) => {
     setRetentionPeriod(value);
     setRetentionUnit(unit);
     try {
-      await window.electronAPI.setStoreValue('retentionPeriod', value);
-      await window.electronAPI.setStoreValue('retentionUnit', unit);
+      await window.electronAPI.store.set('settings.retentionPeriod', value);
+      await window.electronAPI.store.set('settings.retentionUnit', unit);
     } catch (error) {
       console.error('Failed to save retention settings:', error);
     }
@@ -229,7 +277,7 @@ const Settings = () => {
     try {
       // 如果已经在同步中，先取消之前的同步
       if (currentProcessId.current) {
-        await window.electronAPI.cancelSync(currentProcessId.current);
+        await window.electronAPI.sync.cancelSync(currentProcessId.current);
         // 等待一小段时间确保之前的进程被清理
         await new Promise(resolve => setTimeout(resolve, 100));
       }
@@ -238,7 +286,7 @@ const Settings = () => {
       setCurrentCommand(''); // 清空之前的命令输出
       const processId = uuidv4();
       currentProcessId.current = processId;
-      await window.electronAPI.syncData(rcloneConfig, processId);
+      await window.electronAPI.sync.syncData(rcloneConfig, processId);
       notifications.show({
         title: '同步成功',
         message: '数据已成功同步到云端',
@@ -279,14 +327,14 @@ const Settings = () => {
     try {
       // 如果已经在同步中，先取消之前的同步
       if (currentProcessId.current) {
-        await window.electronAPI.cancelSync(currentProcessId.current);
+        await window.electronAPI.sync.cancelSync(currentProcessId.current);
       }
 
       setSyncingLocal(true);
       setCurrentCommand(''); // 清空之前的命令输出
       const processId = uuidv4();
       currentProcessId.current = processId;
-      await window.electronAPI.syncDataFromCloud(rcloneConfig, processId);
+      await window.electronAPI.sync.syncDataFromCloud(rcloneConfig, processId);
       notifications.show({
         title: '同步成功',
         message: '云端数据已成功同步到本地',
@@ -307,7 +355,7 @@ const Settings = () => {
   const handleCancelSync = async () => {
     if (currentProcessId.current) {
       try {
-        await window.electronAPI.cancelSync(currentProcessId.current);
+        await window.electronAPI.sync.cancelSync(currentProcessId.current);
         // 不再在这里添加取消消息，因为主进程会发送取消消息
       } finally {
         setSyncing(false);
@@ -320,7 +368,7 @@ const Settings = () => {
   const handleCheckUpdate = async () => {
     try {
       setCheckingUpdate(true);
-      const result = await window.electronAPI.checkForUpdates()
+      const result = await window.electronAPI.system.checkForUpdates()
       if (result.hasUpdate) {
         // 显示更新信息弹窗
         modals.open({
@@ -336,7 +384,7 @@ const Settings = () => {
                 <Button
                   variant="light"
                   onClick={() => {
-                    window.electronAPI.openExternal(result.downloadUrl!);
+                    window.electronAPI.system.openExternal(result.downloadUrl!);
                     modals.closeAll();
                   }}
                 >
@@ -432,10 +480,10 @@ const Settings = () => {
           <Text fw={500}>快捷键设置</Text>
           <TextInput
             label=""
-            placeholder={isInputFocused ? '请按下快捷键组合...' : '点击此处设置快捷键'}
+            placeholder={isSettingShortcut ? '请按下快捷键组合...' : '点击此处设置快捷键'}
             value={shortcut}
             error={shortcutError}
-            onFocus={() => setIsInputFocused(true)}
+            onFocus={handleFocus}
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
             onKeyUp={handleKeyUp}
@@ -502,7 +550,7 @@ const Settings = () => {
             <Button 
               variant="subtle" 
               size="xs" 
-              onClick={() => window.electronAPI.openStoreDirectory()}
+              onClick={() => window.electronAPI.system.openStoreDirectory()}
             >
               .../
               {historyFilePath.split('/').slice(-2).join('/')}
@@ -592,7 +640,7 @@ const Settings = () => {
               leftSection={<BrandGithub size={16} />}
               onClick={(e) => {
                 e.preventDefault();
-                window.electronAPI.openExternal("https://github.com/yurentle/ClipHarbor");
+                window.electronAPI.system.openExternal("https://github.com/yurentle/ClipHarbor");
               }}
             >
               GitHub

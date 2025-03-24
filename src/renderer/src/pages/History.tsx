@@ -17,7 +17,7 @@ import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import 'dayjs/locale/zh-cn'
 import './history.css'
-import { ClipboardItem, CategoryType, Period } from '../types'
+import { ClipboardItem, CategoryType, Period } from '@types/clipboard'
 
 // 配置 dayjs
 dayjs.extend(relativeTime)
@@ -123,32 +123,26 @@ function History() {
     console.log('initialize--useEffect');
     const initialize = async () => {
       try {
-        // 首先加载设置
-        const period = await window.electronAPI.getStoreValue('retentionPeriod') || 30;
-        const unit = (await window.electronAPI.getStoreValue('retentionUnit') || 'days') as Period;
-
-        // 然后获取历史记录
-        const history = await window.electronAPI.getClipboardHistory();
-        console.log('history', history);
-        const filteredByTime = filterByRetentionPeriod(history, period, unit);
-        setClipboardHistory(filteredByTime);
+        const history = await window.electronAPI.store.get('clipboardHistory');
+        const initialHistory = history || [];
+        setClipboardHistory(initialHistory);
+        
         // 初始化过滤后的历史记录
-        setFilteredHistory(filteredByTime);
-        setDisplayedHistory(filteredByTime.slice(0, ITEMS_PER_PAGE));
-        setHasMore(filteredByTime.length > ITEMS_PER_PAGE);
+        const filtered = filterHistory(initialHistory, searchQuery, category);
+        setFilteredHistory(filtered);
+        setDisplayedHistory(filtered.slice(0, ITEMS_PER_PAGE));
+        setHasMore(filtered.length > ITEMS_PER_PAGE);
 
-        // 设置剪贴板变化监听器
-        const unsubscribe = window.electronAPI.onClipboardChange((newItem) => {
-          setClipboardHistory(prev => {
-            const newHistory = [newItem, ...prev.filter(item => item.content !== newItem.content)];
-            const filtered = filterByRetentionPeriod(newHistory, period, unit);
-            // 应用当前的搜索和分类过滤
-            const finalFiltered = filterHistory(filtered, searchQuery, category);
-            setFilteredHistory(finalFiltered);
-            setDisplayedHistory(finalFiltered.slice(0, ITEMS_PER_PAGE));
-            setHasMore(finalFiltered.length > ITEMS_PER_PAGE);
-            return filtered;
-          });
+        // 监听 store 变化
+        const unsubscribe = window.electronAPI.store.onDidChange((newValue) => {
+          if (Array.isArray(newValue)) {
+            setClipboardHistory(newValue);
+            // 更新过滤后的历史记录
+            const filtered = filterHistory(newValue, searchQuery, category);
+            setFilteredHistory(filtered);
+            setDisplayedHistory(filtered.slice(0, ITEMS_PER_PAGE));
+            setHasMore(filtered.length > ITEMS_PER_PAGE);
+          }
         });
 
         return () => {
@@ -158,14 +152,14 @@ function History() {
         console.error('Error initializing:', error);
       }
     };
-    
+
     initialize();
-  }, []); 
+  }, []); // 只在组件挂载时执行一次
 
   const handleCopy = async (item: ClipboardItem) => {
     try {
-      await window.electronAPI.saveToClipboard(item);
-      await window.electronAPI.closeHistoryWindow();
+      await window.electronAPI.clipboard.saveToClipboard(item);
+      await window.electronAPI.window.closeHistoryWindow();
     } catch (error) {
       console.error('Error saving to clipboard:', error);
     }
@@ -174,7 +168,7 @@ function History() {
   const handleRemove = async (id: string) => {
     console.log('Starting delete operation for id:', id);
     try {
-      const success = await window.electronAPI.removeFromHistory(id);
+      const success = await window.electronAPI.clipboard.removeFromHistory(id);
       console.log('removeFromHistory result:', success);
       
       if (success) {
@@ -199,7 +193,7 @@ function History() {
   const handleToggleFavorite = async (id: string) => {
     console.log('Starting toggle favorite for id:', id);
     try {
-      const success = await window.electronAPI.toggleFavorite(id);
+      const success = await window.electronAPI.clipboard.toggleFavorite(id);
       console.log('toggleFavorite result:', success);
       
       if (success) {
@@ -285,21 +279,36 @@ function History() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
 
-  // 添加失焦自动隐藏功能
-  useEffect(() => {
-    const handleBlur = async () => {
-      // 如果开发者工具打开，不隐藏窗口
-      if (!window.electronAPI.isDevToolsOpened?.()) {
-        await window.electronAPI.closeHistoryWindow();
+  // 修改 handleBlur 函数
+  const handleBlur = async () => {
+    try {
+      // 检查 devtools 是否打开
+      const isDevToolsOpened = await window.electronAPI.window.isDevToolsOpened();
+      if (!isDevToolsOpened) {
+        await window.electronAPI.window.closeHistoryWindow();
       }
-    };
+    } catch (error) {
+      console.error('Error handling window blur:', error);
+    }
+  };
 
+  // 修改 ESC 键处理函数
+  const handleKeyDown = (event: KeyboardEvent) => {
+    if (event.key === 'Escape') {
+      window.electronAPI.window.closeHistoryWindow();
+    }
+  };
+
+  // 添加键盘事件监听
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('blur', handleBlur);
 
     return () => {
+      window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('blur', handleBlur);
     };
-  }, []);
+  }, []); // 移除之前的 blur 监听器，合并到这个 useEffect 中
 
   return (
     <Container p="xs" 
@@ -309,7 +318,13 @@ function History() {
         display: 'flex',
         flexDirection: 'column',
         borderRadius: '10px',
-        WebkitAppRegion: 'drag', // 允许拖动窗口
+        WebkitAppRegion: 'drag',
+      }}
+      tabIndex={0}
+      onKeyDown={(e: React.KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          window.electronAPI.window.closeHistoryWindow();
+        }
       }}
     >
       <Group justify="space-between" mb="md" style={{ WebkitAppRegion: 'no-drag' }}> {/* 搜索区域不可拖动 */}
@@ -336,7 +351,7 @@ function History() {
           onClick={async () => {
             console.log('History: Clicking settings button'); // 添加调试日志
             try {
-              await window.electronAPI.openSettingsWindow();
+              await window.electronAPI.window.openSettingsWindow();
             } catch (error) {
               console.error('Error opening settings window:', error);
             }
