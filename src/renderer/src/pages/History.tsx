@@ -25,6 +25,22 @@ dayjs.locale('zh-cn')
 
 const ITEMS_PER_PAGE = 50;
 
+// 添加 filterByRetentionPeriod 函数
+const filterByRetentionPeriod = (items: ClipboardItem[], period: number, unit: string): ClipboardItem[] => {
+  if (period <= 0) return items; // 如果保留期限为0或负数，返回所有记录
+  
+  const now = dayjs();
+  const cutoffDate = now.subtract(period, unit as dayjs.ManipulateType);
+  
+  return items.filter(item => {
+    // 收藏的项目不受保留期限限制
+    if (item.favorite) return true;
+    
+    const itemDate = dayjs(item.timestamp);
+    return itemDate.isAfter(cutoffDate);
+  });
+};
+
 function History() {
   const viewport = useRef<HTMLDivElement>(null);
   const [clipboardHistory, setClipboardHistory] = useState<ClipboardItem[]>([])
@@ -54,22 +70,6 @@ function History() {
       if (!hasMore) return;
       loadMore();
     }
-  };
-
-  // 根据保存时间过滤历史记录
-  const filterByRetentionPeriod = (
-    items: ClipboardItem[], 
-    period: number, 
-    unit: Period
-  ) => {
-    if (unit === 'permanent') return items;
-    
-    const now = dayjs();
-    const cutoffTime = now.subtract(period, unit).valueOf();
-    
-    return items.filter(item => 
-      item.favorite || item.timestamp >= cutoffTime
-    );
   };
 
   // 过滤历史记录的函数
@@ -118,27 +118,45 @@ function History() {
     updateFilteredResults(filterHistory(clipboardHistory, searchQuery, cat));
   };
 
-  // 加载设置并获取历史记录
+  // 修改 useEffect 中的初始化逻辑
   useEffect(() => {
-    console.log('initialize--useEffect');
     const initialize = async () => {
       try {
-        const history = await window.electronAPI.store.get('clipboardHistory');
-        const initialHistory = history || [];
-        setClipboardHistory(initialHistory);
+        const [history, settings] = await Promise.all([
+          window.electronAPI.store.get('clipboardHistory'),
+          window.electronAPI.store.get('settings')
+        ]);
         
-        // 初始化过滤后的历史记录
-        const filtered = filterHistory(initialHistory, searchQuery, category);
+        const initialHistory = history || [];
+        // 先按保留期限过滤
+        const filteredByPeriod = filterByRetentionPeriod(
+          initialHistory,
+          settings.retentionPeriod,
+          settings.retentionUnit
+        );
+        
+        setClipboardHistory(filteredByPeriod);
+        
+        // 然后按搜索和分类过滤
+        const filtered = filterHistory(filteredByPeriod, searchQuery, category);
         setFilteredHistory(filtered);
         setDisplayedHistory(filtered.slice(0, ITEMS_PER_PAGE));
         setHasMore(filtered.length > ITEMS_PER_PAGE);
 
         // 监听 store 变化
-        const unsubscribe = window.electronAPI.store.onDidChange((newValue) => {
-          if (Array.isArray(newValue)) {
-            setClipboardHistory(newValue);
-            // 更新过滤后的历史记录
-            const filtered = filterHistory(newValue, searchQuery, category);
+        const unsubscribe = window.electronAPI.store.onDidChange((data) => {
+          if (data.key === 'clipboardHistory' && Array.isArray(data.newValue)) {
+            console.log('Clipboard history updated:', data.newValue.length);
+            // 同样先按保留期限过滤
+            const filteredByPeriod = filterByRetentionPeriod(
+              data.newValue,
+              settings.retentionPeriod,
+              settings.retentionUnit
+            );
+            
+            setClipboardHistory(filteredByPeriod);
+            // 然后按搜索和分类过滤
+            const filtered = filterHistory(filteredByPeriod, searchQuery, category);
             setFilteredHistory(filtered);
             setDisplayedHistory(filtered.slice(0, ITEMS_PER_PAGE));
             setHasMore(filtered.length > ITEMS_PER_PAGE);
@@ -154,7 +172,7 @@ function History() {
     };
 
     initialize();
-  }, []); // 只在组件挂载时执行一次
+  }, [searchQuery, category]);
 
   const handleCopy = async (item: ClipboardItem) => {
     try {

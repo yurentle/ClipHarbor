@@ -68,21 +68,20 @@ class StoreManager implements IStore {
         
         // 数据加载完成后，通知所有窗口初始数据
         BrowserWindow.getAllWindows().forEach(window => {
-          window.webContents.send('store-init', this.data);
+          window.webContents.send('store-change', {
+            key: 'clipboardHistory',
+            newValue: this.data.clipboardHistory,
+            oldValue: []
+          });
         });
       } else {
         this.saveToFile();
         this.isLoaded = true;
         logger.info('Created new data file:', this.filePath);
-        
-        // 新文件创建后，同样通知所有窗口初始数据
-        BrowserWindow.getAllWindows().forEach(window => {
-          window.webContents.send('store-init', this.data);
-        });
       }
     } catch (error) {
       logger.error('Error loading data from file:', error);
-      this.isLoaded = true; // 即使出错也标记为已加载完成
+      this.isLoaded = true;
     }
   }
 
@@ -129,7 +128,6 @@ class StoreManager implements IStore {
       this.setNestedValue(this.data, key, value);
       this.isDirty = true;
       this.debouncedSave();
-      this.emitter.emit('change', key, value, oldValue);
       
       // 通知所有窗口数据变化
       BrowserWindow.getAllWindows().forEach(window => {
@@ -140,6 +138,7 @@ class StoreManager implements IStore {
         });
       });
       
+      this.emitter.emit('change', key, value, oldValue);
       return true;
     } catch (error) {
       logger.error('Error setting store value:', error);
