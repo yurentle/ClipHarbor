@@ -1,4 +1,3 @@
-import { BrowserWindow } from 'electron';
 import { BaseWindow } from './windowManager';
 import { WINDOW_SIZES, PATHS } from '../utils/constants';
 import path from 'path';
@@ -27,17 +26,27 @@ export class SettingsWindow extends BaseWindow {
   }
 
   public async create(): Promise<void> {
-    if (this.window && !this.window.isDestroyed()) {
-      this.show();
-      this.focus();
-      return;
+    try {
+      logger.info('Creating settings window...');
+      
+      await super.create();
+      
+      // 如果是新创建的窗口，加载设置页面
+      if (this.window && !this.window.webContents.getURL()) {
+        logger.info('Loading settings page...');
+        try {
+          await this.loadWindow('/settings');
+        } catch (error) {
+          logger.error('Failed to load settings page:', error);
+          throw error;
+        }
+      }
+      
+      logger.info('Settings window created and loaded successfully');
+    } catch (error) {
+      logger.error('Error creating settings window:', error);
+      throw error;
     }
-
-    this.window = new BrowserWindow(this.windowOptions);
-    this.setupWindowEvents();
-    await this.loadWindow('/settings');
-    this.show();
-    logger.info('Settings window created');
   }
 
   protected setupWindowEvents(): void {

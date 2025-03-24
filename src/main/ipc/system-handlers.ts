@@ -3,7 +3,6 @@ import { store } from '../core/store';
 import { shortcutManager } from '../core/shortcut';
 import { logger } from '../utils/logger';
 import { Octokit } from '@octokit/rest';
-import { SystemHandlers } from './types';
 import { IPC_CHANNELS } from '../utils/constants';
 
 export function registerSystemHandlers(): void {
@@ -54,7 +53,7 @@ export function registerSystemHandlers(): void {
   });
 
   ipcMain.handle(IPC_CHANNELS.SYSTEM.GET_HISTORY_FILE_PATH, () => {
-    return store.path;
+    return store.filePath;
   });
 
   ipcMain.handle(IPC_CHANNELS.SYSTEM.REGISTER_SHORTCUT, async (_, shortcut: string) => {

@@ -29,7 +29,7 @@ class StoreManager implements IStore {
   private data: StoreSchema;
   private emitter: EventEmitter;
   readonly path: string;
-  private filePath: string;
+  readonly filePath: string;
   private isDirty: boolean = false;
   private saveDebounceTimeout: NodeJS.Timeout | null = null;
   private isLoaded: boolean = false;

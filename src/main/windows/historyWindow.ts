@@ -31,17 +31,22 @@ export class HistoryWindow extends BaseWindow {
   }
 
   public async create(): Promise<void> {
-    if (this.window && !this.window.isDestroyed()) {
-      this.show();
-      this.focus();
-      return;
+    try {
+      logger.info('Creating history window...');
+      
+      await super.create();
+      
+      // 如果是新创建的窗口，加载历史页面
+      if (this.window && !this.window.webContents.getURL()) {
+        logger.info('Loading history page...');
+        await this.loadWindow('/history');
+      }
+      
+      logger.info('History window created and loaded successfully');
+    } catch (error) {
+      logger.error('Error creating history window:', error);
+      throw error;
     }
-
-    this.window = new BrowserWindow(this.windowOptions);
-    await this.loadWindow('/history');
-    
-    this.setupWindowEvents();
-    logger.info('History window created');
   }
 
   protected setupWindowEvents(): void {

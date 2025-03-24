@@ -6,6 +6,7 @@ import { logger } from '../utils/logger';
 export abstract class BaseWindow {
   public window: BrowserWindow | null = null;
   protected readonly windowOptions: BrowserWindowConstructorOptions;
+  private isCreating: boolean = false; // 添加标志位，防止重复创建
 
   constructor(options: BrowserWindowConstructorOptions) {
     this.windowOptions = {
@@ -26,24 +27,50 @@ export abstract class BaseWindow {
 
     try {
       const baseUrl = IS_DEV
-        ? process.env.ELECTRON_RENDERER_URL
+        ? 'http://localhost:5173'
         : `file://${path.join(__dirname, '../renderer/index.html')}`;
 
       const cleanRoute = route?.startsWith('/') ? route.slice(1) : route;
       const url = cleanRoute ? `${baseUrl}/#/${cleanRoute}` : baseUrl;
       
       logger.info(`Loading window with URL: ${url}`);
-      await this.window.loadURL(url);
       
-      return new Promise<void>((resolve) => {
-        this.window?.webContents.once('did-finish-load', () => {
-          logger.info('Window content loaded successfully');
-          resolve();
-        });
-      });
+      await this.window.loadURL(url);
+      this.window.show();
+      this.window.focus();
     } catch (error) {
-      logger.error('Error loading window:', error);
+      logger.error('Error loading window:', error.message);
+      throw error instanceof Error ? error : new Error(String(error));
+    }
+  }
+
+  public async create(): Promise<void> {
+    if (this.window) {
+      // 如果窗口已存在，只需要显示和聚焦
+      if (this.window.isMinimized()) {
+        this.window.restore();
+      }
+      this.window.show();
+      this.window.focus();
+      return;
+    }
+
+    if (this.isCreating) {
+      logger.info('Window is already being created, waiting...');
+      return;
+    }
+
+    try {
+      this.isCreating = true;
+      logger.info('Creating new window...');
+      this.window = new BrowserWindow(this.windowOptions);
+      this.setupWindowEvents();
+      logger.info('Window created successfully');
+    } catch (error) {
+      logger.error('Error creating window:', error);
       throw error;
+    } finally {
+      this.isCreating = false;
     }
   }
 
@@ -52,7 +79,10 @@ export abstract class BaseWindow {
   }
 
   public show(): void {
-    this.window?.show();
+    if (this.window) {
+      this.window.show();
+      this.window.focus();
+    }
   }
 
   public hide(): void {
@@ -64,6 +94,7 @@ export abstract class BaseWindow {
       if (this.window.isMinimized()) {
         this.window.restore();
       }
+      this.window.show();
       this.window.focus();
     }
   }
@@ -76,7 +107,6 @@ export abstract class BaseWindow {
   }
 
   protected abstract setupWindowEvents(): void;
-  public abstract create(): Promise<void>;
 }
 
 // 添加 IPC 处理程序
