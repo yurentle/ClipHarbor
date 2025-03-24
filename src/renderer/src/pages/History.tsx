@@ -251,17 +251,9 @@ function History() {
                   border: '1px solid var(--mantine-color-gray-2)' 
                 }}
               />
-              <Stack gap="xs">
-                <Text size="xs">
-                  {item.metadata?.width}x{item.metadata?.height}
-                </Text>
-                <Text size="xs" c="dimmed">
-                  {formatBytes(item.metadata?.size || 0)}
-                </Text>
-              </Stack>
             </Group>
             <Text size="xs" c="dimmed">
-              {timeAgo} · 图片
+              {timeAgo} · 图片 · {item.metadata?.width}x{item.metadata?.height} · {formatBytes(item.metadata?.size || 0)}
             </Text>
           </Stack>
         )
@@ -311,14 +303,15 @@ function History() {
   }, []); // 移除之前的 blur 监听器，合并到这个 useEffect 中
 
   return (
-    <Container p="xs" 
+    <Container
       style={{ 
         backgroundColor: 'rgba(255, 255, 255, 0.95)', 
         height: '100vh',
         display: 'flex',
         flexDirection: 'column',
         borderRadius: '10px',
-        WebkitAppRegion: 'drag',
+        outline: 'none',
+        padding: '0'
       }}
       tabIndex={0}
       onKeyDown={(e: React.KeyboardEvent) => {
@@ -327,13 +320,19 @@ function History() {
         }
       }}
     >
-      <Group justify="space-between" mb="md" style={{ WebkitAppRegion: 'no-drag' }}> {/* 搜索区域不可拖动 */}
+      {/* 添加一个div，用于设置拖动区 */}
+      <Group py="xs" style={{ WebkitAppRegion: 'drag', cursor: 'move' }} />
+      <Group
+        justify="space-between"
+        px="sm"
+        pb="xs"
+      >
         <TextInput
-          placeholder="搜索剪贴板历史..."
+          placeholder="搜索剪贴板历史"
           leftSection={<Search size={16} />}
           value={searchQuery}
           onChange={(e) => handleSearch(e.target.value)}
-          style={{ flex: 1 }}
+          style={{ flex: 1, paddingLeft: '4px' }}
         />
         <SegmentedControl
           value={category}
@@ -361,9 +360,9 @@ function History() {
         </ActionIcon>
       </Group>
       <ScrollArea 
-        type="always" 
+        type="always"
+        px='sm'
         scrollbars="y"
-        // h={500}
         viewportRef={viewport}
         onScrollPositionChange={handleScroll}
         style={{ 
@@ -398,7 +397,6 @@ function History() {
                 <div
                   style={{ 
                     flex: 1,
-                    maxWidth: 400
                   }}
                 >
                   {renderContent(item)}

@@ -3,8 +3,7 @@
   background-color: transparent;
   transition: all 200ms ease;
   cursor: pointer;
-  margin: 0 4px;  /* 添加左右边距 */
-  width: calc(100% - 8px) !important;  /* 考虑边距调整宽度 */
+  margin: 0 4px;  /* 添加左右边距，hover的时候会变宽 */
 }
 
 .history-card:hover {
