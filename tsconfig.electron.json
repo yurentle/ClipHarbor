@@ -1,7 +1,6 @@
 {
   "compilerOptions": {
-    "composite": true,
-    "target": "ESNext",
+    "target": "ES2020",
     "module": "CommonJS",
     "allowJs": true,
     "skipLibCheck": true,
@@ -9,12 +8,14 @@
     "noImplicitAny": true,
     "sourceMap": true,
     "baseUrl": ".",
-    "outDir": "dist-electron",
+    "outDir": "dist",
     "moduleResolution": "node",
     "resolveJsonModule": true,
     "paths": {
-      "*": ["node_modules/*"]
+      "@main/*": ["src/main/*"],
+      "@preload/*": ["src/preload/*"],
+      "@types/*": ["src/types/*"]
     }
   },
-  "include": ["electron/**/*"]
+  "include": ["src/main/**/*", "src/preload/**/*", "src/types/**/*"]
 }
