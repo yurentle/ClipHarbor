@@ -246,7 +246,7 @@ function History() {
       case 'text':
         return (
           <Stack gap="xs">
-            <Text lineClamp={3} size="sm">
+            <Text lineClamp={3} size="sm" style={{ wordBreak: 'break-all' }}>
               {item.content}
             </Text>
             <Text size="xs" c="dimmed">
