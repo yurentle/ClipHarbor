@@ -1,27 +1,6 @@
 import { resolve } from 'path'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import react from '@vitejs/plugin-react'
-import { copyFileSync, mkdirSync } from 'fs'
-
-function copyIcons() {
-  const srcDir = resolve('resources/icons')
-  const destDir = resolve('dist/renderer/icons')
-  
-  try {
-    mkdirSync(destDir, { recursive: true })
-    copyFileSync(
-      resolve(srcDir, 'logo_tray_Template@2x.png'),
-      resolve(destDir, 'logo_tray_Template@2x.png')
-    )
-    copyFileSync(
-      resolve(srcDir, 'logo_dock.png'),
-      resolve(destDir, 'logo_dock.png')
-    )
-    console.log('Icons copied successfully')
-  } catch (error) {
-    console.error('Error copying icons:', error)
-  }
-}
 
 export default defineConfig({
   main: {
@@ -64,17 +43,17 @@ export default defineConfig({
         '@types': resolve('src/types')
       }
     },
-    plugins: [
-      react(),
-      {
-        name: 'copy-icons',
-        buildEnd() {
-          copyIcons()
+    plugins: [react()],
+    build: {
+      outDir: 'dist/renderer',
+      rollupOptions: {
+        output: {
+          format: 'cjs',
+          entryFileNames: '[name].js',
+          chunkFileNames: '[name].js',
+          assetFileNames: '[name][extname]'
         }
       }
-    ],
-    build: {
-      outDir: 'dist/renderer'
     },
     server: {
       port: 5173,

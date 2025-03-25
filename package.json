@@ -70,10 +70,9 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
     },
-    "asar": {
-      "smartUnpack": true
-    },
+    "asar": false,
     "asarUnpack": [
+      "dist/renderer/**/*",
       "node_modules/electron-store/**/*"
     ]
   },

@@ -26,20 +26,35 @@ export abstract class BaseWindow {
     if (!this.window) return;
 
     try {
-      const baseUrl = IS_DEV
-        ? 'http://localhost:5173'
-        : `file://${path.join(__dirname, '../renderer/index.html')}`;
+      if (IS_DEV) {
+        const url = `http://localhost:5173${route ? `/#/${route}` : ''}`;
+        logger.info(`Loading dev window with URL: ${url}`);
+        await this.window.loadURL(url);
+      } else {
+        const indexPath = path.join(__dirname, '..', 'renderer', 'index.html');
+        logger.info('Loading production window from:', indexPath);
+        
+        // 先加载 HTML 文件
+        await this.window.loadFile(indexPath);
+        
+        // 如果有路由，再通过 hash 导航
+        if (route) {
+          const cleanRoute = route.startsWith('/') ? route.slice(1) : route;
+          await this.window.webContents.executeJavaScript(
+            `window.location.hash = '/${cleanRoute}'`
+          );
+        }
+      }
 
-      const cleanRoute = route?.startsWith('/') ? route.slice(1) : route;
-      const url = cleanRoute ? `${baseUrl}/#/${cleanRoute}` : baseUrl;
-      
-      logger.info(`Loading window with URL: ${url}`);
-      
-      await this.window.loadURL(url);
       this.window.show();
       this.window.focus();
     } catch (error) {
-      logger.error('Error loading window:', error.message);
+      logger.error('Error loading window:', error);
+      logger.error('Error details:', {
+        isDev: IS_DEV,
+        dirname: __dirname,
+        route: route
+      });
       throw error instanceof Error ? error : new Error(String(error));
     }
   }
