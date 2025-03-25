@@ -62,9 +62,6 @@ export abstract class BaseWindow {
   public async create(): Promise<void> {
     if (this.window) {
       // 如果窗口已存在，只需要显示和聚焦
-      if (this.window.isMinimized()) {
-        this.window.restore();
-      }
       this.window.show();
       this.window.focus();
       return;
@@ -106,9 +103,6 @@ export abstract class BaseWindow {
 
   public focus(): void {
     if (this.window) {
-      if (this.window.isMinimized()) {
-        this.window.restore();
-      }
       this.window.show();
       this.window.focus();
     }

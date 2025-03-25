@@ -39,7 +39,7 @@ export class HistoryWindow extends BaseWindow {
       // 如果是新创建的窗口，加载历史页面
       if (this.window && !this.window.webContents.getURL()) {
         logger.info('Loading history page...');
-        await this.loadWindow('/history');
+        await this.loadWindow('history');
       }
       
       logger.info('History window created and loaded successfully');

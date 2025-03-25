@@ -35,7 +35,7 @@ export class SettingsWindow extends BaseWindow {
       if (this.window && !this.window.webContents.getURL()) {
         logger.info('Loading settings page...');
         try {
-          await this.loadWindow('/settings');
+          await this.loadWindow('settings');
         } catch (error) {
           logger.error('Failed to load settings page:', error);
           throw error;
