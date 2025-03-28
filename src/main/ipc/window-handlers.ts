@@ -2,7 +2,6 @@ import { ipcMain } from 'electron';
 import { HistoryWindow } from '../windows/historyWindow';
 import { SettingsWindow } from '../windows/settingsWindow';
 import { logger } from '../utils/logger';
-import { WindowHandlers } from './types';
 import { IPC_CHANNELS } from '../utils/constants';
 
 export function registerWindowHandlers(): void {

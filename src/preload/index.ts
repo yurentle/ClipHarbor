@@ -1,7 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import { BrowserWindow } from 'electron'
-import { ElectronAPI } from '@types/electron'
-import { ClipboardItem } from '@types/clipboard'
+import { ElectronAPI } from '../types/electron'
+import { ClipboardItem } from '../types/clipboard'
 
 type UpdateInfo = {
   hasUpdate: boolean;
@@ -93,16 +92,3 @@ contextBridge.exposeInMainWorld('electronAPI', {
   sync: syncAPI,
   ipcRenderer: ipcAPI,
 } as ElectronAPI)
-
-contextBridge.exposeInMainWorld('electron', {
-  // ... 其他已有的方法 ...
-  
-  // 添加窗口相关方法
-  window: {
-    blur: () => ipcRenderer.send('window-blur'),
-    focus: () => ipcRenderer.send('window-focus'),
-    hide: () => ipcRenderer.send('window-hide'),
-    show: () => ipcRenderer.send('window-show'),
-    close: () => ipcRenderer.send('window-close'),
-  }
-})

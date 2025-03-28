@@ -24,7 +24,8 @@ export default defineConfig({
     plugins: [externalizeDepsPlugin()],
     resolve: {
       alias: {
-        '@preload': resolve('src/preload')
+        '@preload': resolve('src/preload'),
+        '@types': resolve('src/types')
       }
     },
     build: {
